@@ -62,6 +62,26 @@ services:
       DB_COMPONENT: billing
     command: ["/bin/sh", "-ec", "alembic upgrade head && exec uvicorn nexora.source:billing --host 0.0.0.0"]
 
+  api:
+    <<: *app
+    environment: &core-env
+      <<: *app-env
+      DATABASE_URL: postgresql+psycopg://integration:integration-local-db@postgres/integration
+      DB_COMPONENT: core
+      BROKER_PASSWORD: nexora-local-broker
+      VIEWER_KEY: ${NEXORA_VIEWER_KEY:-nexora-local-viewer}
+      OPERATOR_KEY: ${NEXORA_OPERATOR_KEY:-nexora-local-operator}
+      ADMIN_KEY: ${NEXORA_ADMIN_KEY:-nexora-local-admin}
+    command: ["/bin/sh", "-ec", "alembic upgrade head && exec uvicorn nexora.api:app --host 0.0.0.0"]
+  worker:
+    build: .
+    environment: *core-env
+    depends_on:
+      api:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: ["python", "-m", "nexora.worker"]
 
 volumes:
   postgres:

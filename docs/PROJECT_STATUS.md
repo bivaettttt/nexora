@@ -1,3 +1,3 @@
 # Состояние проекта / Project status
 
-[Требования](analysis/mvp.md), [архитектура](architecture/design.md) и [AsyncAPI](integrations/asyncapi.yaml) зафиксированы. Следующий шаг — сервисы CRM REST, ERP SOAP и Billing REST со своими БД, затем реальный обмен через RabbitMQ.
+CRM REST, ERP SOAP и Billing REST работают в отдельных контейнерах с собственными базами. Сквозная проверка Compose подтвердила создание и обновление клиента, доставку через RabbitMQ, оплату Billing → CRM и чтение проекций для сверки. Следующий шаг — операционный интерфейс и проверки отказов, восстановления и карантина в изолированном Compose.

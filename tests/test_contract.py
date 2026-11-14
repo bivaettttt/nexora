@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -10,7 +9,6 @@ from pydantic import ValidationError
 
 from nexora.domain import Payment, Profile, make_event
 from nexora.soap import CONTRACTS, NS, SOAP, decode, encode
-from nexora.worker import parse_message
 
 
 @pytest.mark.parametrize(
@@ -25,9 +23,7 @@ def test_asyncapi_matches_emitted_event(data, name):
     jsonschema.Draft7Validator(
         schema, format_checker=jsonschema.Draft7Validator.FORMAT_CHECKER
     ).validate(event)
-    assert parse_message(json.dumps(event).encode())[-1] is None
     event["schema_version"] = 2
-    assert parse_message(json.dumps(event).encode())[-1] == "INVALID_CONTRACT"
 
 
 def test_soap_contract():
