@@ -1,3 +1,7 @@
 # Состояние проекта / Project status
 
-CRM REST, ERP SOAP и Billing REST работают в отдельных контейнерах с собственными базами. Сквозная проверка Compose подтвердила создание и обновление клиента, доставку через RabbitMQ, оплату Billing → CRM и чтение проекций для сверки. Следующий шаг — операционный интерфейс и проверки отказов, восстановления и карантина в изолированном Compose.
+Реализованы CRM REST, ERP SOAP, Billing REST, Nexora API/Worker, RabbitMQ и операционная консоль. Основной стенд доступен на 8090, отдельная лаборатория запускается на 8091. [Запуск](../README.ru.md)
+
+[Требования](analysis/mvp.md), [архитектура](architecture/design.md), [контракты](integrations/contracts.md) и [трассируемость](testing/traceability.md) связаны с кодом и проверками. [Отчёт](testing/results.md) фиксирует запуск и результаты на реальных сервисах. [Скриншоты](../assets/screenshots) сняты на изолированном стенде.
+
+Состояние опубликованной версии проверяется по [GitHub Actions](https://github.com/bivaettttt/nexora/actions). Ограничения и возможные следующие шаги описаны в [README](../README.ru.md).
