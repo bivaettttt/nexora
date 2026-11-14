@@ -229,7 +229,8 @@ function Dashboard() {
           ["Принято событий", d?.events],
           ["Изолировано", d && d.rejected + (failed ?? 0)],
           ["RabbitMQ · готово", broker.data?.ready],
-          ["Задержка p95", d?.p95_ms == null ? null : d.p95_ms + " мс"],
+          ["Попытка · p95", d?.p95_ms == null ? null : d.p95_ms + " мс"],
+          ["Попытка · среднее", d?.mean_ms == null ? null : d.mean_ms + " мс"],
         ].map(([label, value]) => (
           <div key={label}>
             <span>{label}</span>
@@ -249,7 +250,7 @@ function Dashboard() {
                 </span>
                 <Badge status={s.reachable ? "UP" : "DOWN"} />
               </div>
-            )) ?? <Empty pending />}
+            )) ?? <Empty pending={systems.isPending} />}
           </div>
         </Panel>
         <Panel title="Статусы доставок">

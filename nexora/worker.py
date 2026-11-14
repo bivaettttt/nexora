@@ -45,7 +45,7 @@ def parse_message(raw: bytes):
     except ValidationError:
         # Keep validation metadata without retaining arbitrary untrusted values.
         return uuid4(), digest, {"bytes": len(raw)}, None, "INVALID_CONTRACT"
-    return event.id, digest, payload, event, None
+    return event.id, digest, event.model_dump(mode="json"), event, None
 
 
 def ingest(raw: bytes):

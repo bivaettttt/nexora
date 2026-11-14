@@ -80,6 +80,14 @@ def target_result(response):
 
 
 def repair(customer, role):
+    comparison = reconcile(customer)
+    if comparison["records"]["CRM"] is None:
+        raise HTTPException(409, "AUTHORITATIVE_PROFILE_UNAVAILABLE")
+    if not any(
+        issue["target"] in FIELDS and issue["code"] in {"MISSING", "VERSION_LAG"}
+        for issue in comparison["issues"]
+    ):
+        raise HTTPException(409, "NO_REPAIRABLE_DRIFT")
     correlation = uuid4()
     result = target_result(
         request(

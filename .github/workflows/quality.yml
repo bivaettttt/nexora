@@ -20,6 +20,7 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: ruff check nexora migrations tests scripts && ruff format --check nexora migrations tests scripts
       - run: pytest -q && PYTHONPATH=. python scripts/openapi.py --check && python scripts/check-repository.py
+      - run: npx --yes @asyncapi/cli@6.3.0 validate docs/integrations/asyncapi.yaml
       - working-directory: frontend
         run: npm ci && npm run format:check && npm run build
       - run: scripts/lab up

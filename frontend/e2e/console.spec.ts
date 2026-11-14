@@ -59,6 +59,17 @@ test("lab submits a real invalid event and shows quarantine", async ({
     .getByRole("button", { name: "Отправить неверный контракт" })
     .click();
   await expect(page.getByText(/"published": "invalid"/)).toBeVisible();
+  await expect
+    .poll(async () => {
+      const current: { event_id: string; code: string }[] = await (
+        await page.request.get("/api/errors?dead_only=true", { headers })
+      ).json();
+      return current.some(
+        (row) =>
+          !previousIds.has(row.event_id) && row.code === "INVALID_CONTRACT",
+      );
+    })
+    .toBe(true);
   await expect(page.getByText("INVALID_CONTRACT").first()).toBeVisible();
 });
 

@@ -4,6 +4,8 @@ import { ArrowUpRight, AlertCircle } from "lucide-react";
 import { short, stamp, type EventRow } from "./api";
 
 export const titleState: Record<string, string> = {
+  UP: "Доступна",
+  DOWN: "Недоступна",
   PENDING: "В очереди",
   RETRY: "Ожидает повтора",
   SUCCEEDED: "Доставлено",

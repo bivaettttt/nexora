@@ -28,6 +28,12 @@ class Switch(Strict):
 
 
 def install_fault_control(app):
+    @app.get("/ready")
+    def ready():
+        with engine().connect() as conn:
+            check_availability(conn)
+        return {"status": "ok"}
+
     @app.put("/v1/lab/availability", dependencies=[Depends(internal)])
     def control(payload: Switch):
         if os.getenv("LAB_MODE") != "1":

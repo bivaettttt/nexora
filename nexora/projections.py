@@ -1,4 +1,3 @@
-import json
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -145,11 +144,3 @@ def read_projection(conn, table: str, identifier: UUID):
     if record is None:
         raise HTTPException(404, "RECORD_MISSING")
     return record
-
-
-def synthetic_outbox(conn, payload):
-    run(
-        conn,
-        "INSERT INTO outbox(id,payload) VALUES (gen_random_uuid(),CAST(:raw AS jsonb))",
-        raw=json.dumps(payload),
-    )

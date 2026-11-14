@@ -36,3 +36,5 @@ npm run test:e2e
 ```
 
 [GitHub Actions status](https://github.com/bivaettttt/nexora/actions)
+
+The AsyncAPI CLI validated the AMQP document. It reported advisory metadata warnings for the contact and license fields. Payload examples are also checked against the runtime event models in pytest.

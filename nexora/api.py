@@ -45,7 +45,9 @@ def systems(role: Read):
     result = []
     for target, address in ADDRESSES.items():
         try:
-            alive = request(target, "GET", "/health").is_success
+            alive = request(
+                target, "GET", "/health" if target == "CRM" else "/ready"
+            ).is_success
         except httpx.TransportError:
             alive = False
         result.append(

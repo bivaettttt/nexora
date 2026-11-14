@@ -1,7 +1,12 @@
 asyncapi: 2.6.0
+id: urn:nexora:integration:v1
+defaultContentType: application/json
+tags:
+  - name: integration
 info:
   title: Nexora inbound events
   version: 1.0.0
+  description: Versioned CRM profiles and Billing payment status events consumed by the Nexora Worker.
 servers:
   compose:
     url: rabbitmq:5672
@@ -17,6 +22,7 @@ channels:
           exclusive: false
           autoDelete: false
     subscribe:
+      operationId: consumeIntegrationEvents
       message:
         oneOf:
           - $ref: '#/components/messages/Profile'
@@ -25,6 +31,7 @@ components:
   messages:
     Profile:
       name: customer.profile
+      messageId: customer.profile.v1
       payload:
         allOf:
           - $ref: '#/components/schemas/Envelope'
@@ -41,6 +48,7 @@ components:
                   email: {type: [string, 'null'], maxLength: 160}
     Payment:
       name: customer.payment
+      messageId: customer.payment.v1
       payload:
         allOf:
           - $ref: '#/components/schemas/Envelope'

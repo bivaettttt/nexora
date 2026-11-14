@@ -11,6 +11,9 @@ def availability(target, unavailable):
 def outages_and_replay():
     availability("ERP", True)
     try:
+        assert not next(s for s in call("GET", "/systems") if s["name"] == "ERP")[
+            "reachable"
+        ]
         created = profile("ERP recovery")
         event = created["event_id"]
         customer = created["record"]["id"]
@@ -81,6 +84,7 @@ def repair_projection():
     repair = call("POST", f"/reconciliation/{customer}/repair", 202)
     completed(repair["event_id"], {"ERP": "SUCCEEDED", "Billing": "SUCCEEDED"})
     assert call("GET", f"/reconciliation/{customer}")["issues"] == []
+    call("POST", f"/reconciliation/{customer}/repair", 409)
 
 
 def security_checks():
@@ -104,6 +108,8 @@ def security_checks():
 if __name__ == "__main__":
     from integration_smoke import test_route
 
+    availability("ERP", False)
+    availability("Billing", False)
     security_checks()
     quarantine_dedupe_stale(test_route())
     outages_and_replay()

@@ -99,6 +99,10 @@ const errors: Record<string, string> = {
   SOURCE_UNAVAILABLE: "Источник временно недоступен.",
   BROKER_UNAVAILABLE: "RabbitMQ временно недоступен.",
   MESSAGE_MISSING: "Событие ещё не получено или отсутствует.",
+  NO_REPAIRABLE_DRIFT:
+    "Повторите сверку: расхождение уже устранено или требует ручного разбора.",
+  AUTHORITATIVE_PROFILE_UNAVAILABLE:
+    "Профиль CRM недоступен для восстановления.",
   VERSION_CONFLICT: "Конфликт данных одной версии.",
 };
 export async function api<T>(
