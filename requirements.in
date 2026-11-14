@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+psycopg[binary]
+sqlalchemy
+alembic
+pika
+httpx
+lxml

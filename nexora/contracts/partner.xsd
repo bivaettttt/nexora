@@ -1,0 +1,18 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:p="urn:nexora:partner:v1"
+ targetNamespace="urn:nexora:partner:v1" elementFormDefault="qualified">
+  <xs:simpleType name="UUID"><xs:restriction base="xs:string"><xs:pattern value="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"/></xs:restriction></xs:simpleType>
+  <xs:simpleType name="LegalName"><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="120"/></xs:restriction></xs:simpleType>
+  <xs:simpleType name="Version"><xs:restriction base="xs:int"><xs:minInclusive value="1"/></xs:restriction></xs:simpleType>
+  <xs:element name="UpsertPartner">
+    <xs:complexType><xs:sequence><xs:element name="GlobalId" type="p:UUID"/><xs:element name="Version" type="p:Version"/><xs:element name="LegalName" type="p:LegalName"/></xs:sequence></xs:complexType>
+  </xs:element>
+  <xs:element name="UpsertPartnerResponse">
+    <xs:complexType><xs:sequence><xs:element name="Outcome"><xs:simpleType><xs:restriction base="xs:string"><xs:enumeration value="APPLIED"/><xs:enumeration value="SAME"/><xs:enumeration value="STALE"/></xs:restriction></xs:simpleType></xs:element></xs:sequence></xs:complexType>
+  </xs:element>
+  <xs:element name="GetPartner">
+    <xs:complexType><xs:sequence><xs:element name="GlobalId" type="p:UUID"/></xs:sequence></xs:complexType>
+  </xs:element>
+  <xs:element name="GetPartnerResponse">
+    <xs:complexType><xs:sequence><xs:element name="GlobalId" type="p:UUID"/><xs:element name="LocalId" type="p:UUID"/><xs:element name="Version" type="p:Version"/><xs:element name="LegalName" type="p:LegalName"/></xs:sequence></xs:complexType>
+  </xs:element>
+</xs:schema>

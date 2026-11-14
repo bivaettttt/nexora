@@ -1,4 +1,18 @@
 name: nexora
+x-app: &app
+  build: .
+  depends_on:
+    postgres:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2).close()"]
+    interval: 3s
+    timeout: 3s
+    retries: 30
+x-app-env: &app-env
+  SERVICE_KEY: nexora-local-service
+  AMQP_URL: amqp://nexora:nexora-local-broker@rabbitmq:5672/%2F
+  LAB_MODE: ${NEXORA_LAB_MODE:-0}
 services:
   postgres:
     image: postgres:16-alpine
@@ -8,6 +22,7 @@ services:
       POSTGRES_DB: nexora
     volumes:
       - postgres:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/01-services.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U nexora -d nexora"]
       interval: 2s
@@ -25,6 +40,29 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
+  crm:
+    <<: *app
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql+psycopg://crm:crm-local-db@postgres/crm
+      DB_COMPONENT: crm
+    command: ["/bin/sh", "-ec", "alembic upgrade head && exec uvicorn nexora.source:crm --host 0.0.0.0"]
+  erp:
+    <<: *app
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql+psycopg://erp:erp-local-db@postgres/erp
+      DB_COMPONENT: erp
+    command: ["/bin/sh", "-ec", "alembic upgrade head && exec uvicorn nexora.erp:app --host 0.0.0.0"]
+  billing:
+    <<: *app
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql+psycopg://billing:billing-local-db@postgres/billing
+      DB_COMPONENT: billing
+    command: ["/bin/sh", "-ec", "alembic upgrade head && exec uvicorn nexora.source:billing --host 0.0.0.0"]
+
+
 volumes:
   postgres:
   rabbitmq:

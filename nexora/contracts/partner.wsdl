@@ -1,0 +1,19 @@
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:xs="http://www.w3.org/2001/XMLSchema"
+ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:p="urn:nexora:partner:v1"
+ targetNamespace="urn:nexora:partner:v1" name="PartnerService">
+  <types><xs:schema><xs:import namespace="urn:nexora:partner:v1" schemaLocation="partner.xsd"/></xs:schema></types>
+  <message name="UpsertPartnerRequest"><part name="body" element="p:UpsertPartner"/></message>
+  <message name="UpsertPartnerReply"><part name="body" element="p:UpsertPartnerResponse"/></message>
+  <message name="GetPartnerRequest"><part name="body" element="p:GetPartner"/></message>
+  <message name="GetPartnerReply"><part name="body" element="p:GetPartnerResponse"/></message>
+  <portType name="PartnerPort">
+    <operation name="UpsertPartner"><input message="p:UpsertPartnerRequest"/><output message="p:UpsertPartnerReply"/></operation>
+    <operation name="GetPartner"><input message="p:GetPartnerRequest"/><output message="p:GetPartnerReply"/></operation>
+  </portType>
+  <binding name="PartnerSoap" type="p:PartnerPort">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="UpsertPartner"><soap:operation soapAction="urn:nexora:partner:v1:UpsertPartner"/><input><soap:body use="literal"/></input><output><soap:body use="literal"/></output></operation>
+    <operation name="GetPartner"><soap:operation soapAction="urn:nexora:partner:v1:GetPartner"/><input><soap:body use="literal"/></input><output><soap:body use="literal"/></output></operation>
+  </binding>
+  <service name="PartnerService"><port name="PartnerSoap" binding="p:PartnerSoap"><soap:address location="http://erp:8000/soap"/></port></service>
+</definitions>
