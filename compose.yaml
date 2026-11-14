@@ -46,7 +46,7 @@ services:
       <<: *app-env
       DATABASE_URL: postgresql+psycopg://crm:crm-local-db@postgres/crm
       DB_COMPONENT: crm
-    command: ["/bin/sh", "-ec", "alembic upgrade head && exec uvicorn nexora.source:crm --host 0.0.0.0"]
+    command: ["/bin/sh", "-ec", "alembic upgrade head && python -m nexora.seed && exec uvicorn nexora.source:crm --host 0.0.0.0"]
   erp:
     <<: *app
     environment:
@@ -82,6 +82,16 @@ services:
       rabbitmq:
         condition: service_healthy
     command: ["python", "-m", "nexora.worker"]
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "127.0.0.1:${NEXORA_PORT:-8090}:80"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   postgres:

@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+case "${1:-up}" in
+  up) NEXORA_LAB_MODE=1 NEXORA_PORT="${NEXORA_LAB_PORT:-8091}" docker compose -p nexora-lab up -d --build --wait ;;
+  down) docker compose -p nexora-lab down ;;
+  reset) docker compose -p nexora-lab down -v ;;
+  *) echo "Usage: scripts/lab [up|down|reset]" >&2; exit 2 ;;
+esac
