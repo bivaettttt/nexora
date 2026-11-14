@@ -55,6 +55,11 @@ test("lab submits a real invalid event and shows quarantine", async ({
 }) => {
   await login(page);
   await page.getByRole("link", { name: "Лаборатория" }).click();
+  const headers = { Authorization: "Bearer nexora-local-admin" };
+  const prior: { event_id: string }[] = await (
+    await page.request.get("/api/errors?dead_only=true", { headers })
+  ).json();
+  const previousIds = new Set(prior.map((row) => row.event_id));
   await page
     .getByRole("button", { name: "Отправить неверный контракт" })
     .click();
