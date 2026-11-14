@@ -1,0 +1,62 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+project="${1:-nexora-lab}"
+dc() { docker compose -p "$project" "$@"; }
+cleanup() { dc start rabbitmq worker >/dev/null 2>&1 || true; }
+trap cleanup EXIT
+dc stop worker rabbitmq
+result=$(dc exec -T api python -c 'from nexora.adapters import request; r=request("CRM","POST","/v1/customers",json={"name":"Restart and durable outbox"}); r.raise_for_status(); print(r.json()["event_id"])')
+dc exec -T -e CHECK_ID="$result" crm python - <<'PY'
+import os
+from nexora.db import engine, one
+
+with engine().connect() as conn:
+    assert one(conn, "SELECT sent_at FROM outbox WHERE id=:id", id=os.environ["CHECK_ID"]) == {"sent_at": None}
+PY
+dc start rabbitmq worker
+dc exec -T -e CHECK_ID="$result" api python - <<'PY'
+import os
+import time
+from nexora.operations import message
+
+deadline = time.monotonic() + 40
+while time.monotonic() < deadline:
+    result = message(os.environ["CHECK_ID"])
+    if result and len(result["deliveries"]) == 2 and all(row["status"] == "SUCCEEDED" for row in result["deliveries"]):
+        break
+    time.sleep(.3)
+else:
+    raise SystemExit("Committed event did not survive broker and worker restart")
+PY
+# Simulate source relay crash after broker confirmation and before recording sent_at.
+dc exec -T -e CHECK_ID="$result" crm python - <<'PY'
+import os
+from nexora.db import engine, run
+
+with engine().begin() as conn:
+    run(conn, "UPDATE outbox SET sent_at=NULL WHERE id=:id", id=os.environ["CHECK_ID"])
+PY
+dc exec -T -e CHECK_ID="$result" crm python - <<'PY'
+import os
+import time
+from nexora.db import engine, one
+
+deadline = time.monotonic() + 20
+while time.monotonic() < deadline:
+    with engine().connect() as conn:
+        if one(conn, "SELECT sent_at FROM outbox WHERE id=:id", id=os.environ["CHECK_ID"])["sent_at"]:
+            break
+    time.sleep(.25)
+else:
+    raise SystemExit("Relay did not republish the outbox record")
+PY
+dc exec -T -e CHECK_ID="$result" api python - <<'PY'
+import os
+from nexora.operations import message
+
+result = message(os.environ["CHECK_ID"])
+assert len(result["deliveries"]) == 2
+assert all(len(row["attempts"]) == 1 for row in result["deliveries"])
+PY
+echo "Broker outage, worker restart and confirmed outbox republication verified"

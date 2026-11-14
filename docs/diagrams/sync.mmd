@@ -1,0 +1,15 @@
+sequenceDiagram
+ actor Operator
+ participant API
+ participant CRM
+ participant ERP
+ participant Billing
+ Operator->>API: GET reconciliation/customer UUID
+ API->>CRM: GET /v1/customers/UUID
+ CRM-->>API: CRM snapshot or 404
+ API->>ERP: SOAP GetPartner
+ ERP-->>API: Partner snapshot or SOAP Fault
+ API->>Billing: GET /v1/customers/UUID
+ Billing-->>API: Contract snapshot or 404
+ API->>API: Compare global ID, version and owned fields
+ API-->>Operator: Snapshots and discrepancies

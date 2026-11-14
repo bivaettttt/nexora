@@ -1,0 +1,82 @@
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="NexoraDefinitions" targetNamespace="urn:nexora:bpmn">
+  <bpmn:process id="Ingress" isExecutable="false">
+    <bpmn:startEvent id="start" name="AMQP event" />
+    <bpmn:task id="validate" name="Validate envelope and deduplicate" />
+    <bpmn:exclusiveGateway id="classify" name="Classification" />
+    <bpmn:task id="store" name="Commit inbox and target deliveries" />
+    <bpmn:task id="reject" name="Persist quarantine record" />
+    <bpmn:task id="ack" name="Acknowledge delivery" />
+    <bpmn:endEvent id="done" name="Ingress complete" />
+    <bpmn:sequenceFlow id="Flow0" sourceRef="start" targetRef="validate" name="" />
+    <bpmn:sequenceFlow id="Flow1" sourceRef="validate" targetRef="classify" name="" />
+    <bpmn:sequenceFlow id="Flow2" sourceRef="classify" targetRef="store" name="Valid, first receipt" />
+    <bpmn:sequenceFlow id="Flow3" sourceRef="classify" targetRef="reject" name="Invalid or conflicting" />
+    <bpmn:sequenceFlow id="Flow4" sourceRef="classify" targetRef="ack" name="Matching duplicate" />
+    <bpmn:sequenceFlow id="Flow5" sourceRef="store" targetRef="ack" name="" />
+    <bpmn:sequenceFlow id="Flow6" sourceRef="reject" targetRef="ack" name="" />
+    <bpmn:sequenceFlow id="Flow7" sourceRef="ack" targetRef="done" name="" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="IngressDiagram">
+    <bpmndi:BPMNPlane id="IngressPlane" bpmnElement="Ingress">
+      <bpmndi:BPMNShape id="start_shape" bpmnElement="start">
+        <dc:Bounds x="20" y="125" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="validate_shape" bpmnElement="validate">
+        <dc:Bounds x="80" y="103" width="145" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="classify_shape" bpmnElement="classify">
+        <dc:Bounds x="255" y="118" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="store_shape" bpmnElement="store">
+        <dc:Bounds x="365" y="42" width="145" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="reject_shape" bpmnElement="reject">
+        <dc:Bounds x="365" y="225" width="145" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ack_shape" bpmnElement="ack">
+        <dc:Bounds x="570" y="103" width="145" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="done_shape" bpmnElement="done">
+        <dc:Bounds x="755" y="125" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="edge0" bpmnElement="Flow0">
+        <di:waypoint x="56" y="143" />
+        <di:waypoint x="80" y="143" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge1" bpmnElement="Flow1">
+        <di:waypoint x="225" y="143" />
+        <di:waypoint x="255" y="143" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge2" bpmnElement="Flow2">
+        <di:waypoint x="280" y="118" />
+        <di:waypoint x="280" y="82" />
+        <di:waypoint x="365" y="82" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge3" bpmnElement="Flow3">
+        <di:waypoint x="280" y="168" />
+        <di:waypoint x="280" y="265" />
+        <di:waypoint x="365" y="265" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge4" bpmnElement="Flow4">
+        <di:waypoint x="305" y="143" />
+        <di:waypoint x="570" y="143" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge5" bpmnElement="Flow5">
+        <di:waypoint x="510" y="82" />
+        <di:waypoint x="540" y="82" />
+        <di:waypoint x="540" y="120" />
+        <di:waypoint x="570" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge6" bpmnElement="Flow6">
+        <di:waypoint x="510" y="265" />
+        <di:waypoint x="540" y="265" />
+        <di:waypoint x="540" y="167" />
+        <di:waypoint x="570" y="167" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge7" bpmnElement="Flow7">
+        <di:waypoint x="715" y="143" />
+        <di:waypoint x="755" y="143" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,51 @@
+erDiagram
+ EVENTS ||--o{ DELIVERIES : routes
+ DELIVERIES ||--o{ ATTEMPTS : records
+ EVENTS {
+   uuid id PK
+   uuid correlation_id
+   uuid customer_id
+   jsonb payload
+   text digest
+   text rejection
+ }
+ DELIVERIES {
+   uuid id PK
+   uuid event_id FK
+   text target
+   text status
+   int generation
+   int calls
+   timestamptz next_at
+ }
+ ATTEMPTS {
+   bigint id PK
+   uuid delivery_id FK
+   int generation
+   int number
+   int duration_ms
+   int http_status
+   text outcome
+ }
+ OUTBOX {
+   uuid id PK
+   jsonb payload
+   timestamptz sent_at
+ }
+ CUSTOMERS {
+   uuid id PK
+   uuid local_id UK
+   int version
+   int payment_version
+ }
+ PARTNERS {
+   uuid id PK
+   uuid local_id UK
+   int version
+ }
+ CONTRACTS {
+   uuid id PK
+   uuid local_id UK
+   int version
+   int payment_version
+ }

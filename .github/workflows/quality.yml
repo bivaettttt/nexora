@@ -1,0 +1,33 @@
+name: Quality
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check nexora migrations tests scripts && ruff format --check nexora migrations tests scripts
+      - run: pytest -q && PYTHONPATH=. python scripts/openapi.py --check && python scripts/check-repository.py
+      - working-directory: frontend
+        run: npm ci && npm run format:check && npm run build
+      - run: scripts/lab up
+      - run: docker compose -p nexora-lab exec -T crm python - < scripts/services-smoke.py
+      - run: scripts/run-integration && scripts/restart-check
+      - working-directory: frontend
+        run: npx playwright install --with-deps chromium && npm run test:e2e
+      - if: failure()
+        run: docker compose -p nexora-lab logs --no-color
+      - if: always()
+        run: scripts/lab reset

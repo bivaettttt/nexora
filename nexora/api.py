@@ -12,6 +12,7 @@ from nexora.broker import connect, publish
 from nexora.db import engine, one, rows, run
 from nexora.domain import ROUTES, Payment, Profile, Strict
 from nexora.operations import message, reconcile, repair, replay, target_result
+from nexora.rest_models import CustomerRecord, Publication, Reconciliation
 from nexora.source import Switch
 
 app = FastAPI(title="Nexora Integration API", version="1.0.0")
@@ -169,26 +170,28 @@ def recover(identifier: UUID, role: Write):
     return result
 
 
-@app.get("/api/customers")
+@app.get("/api/customers", response_model=list[CustomerRecord])
 def customers(role: Read):
     return target_result(request("CRM", "GET", "/v1/customers"))
 
 
-@app.post("/api/customers", status_code=201)
+@app.post("/api/customers", status_code=201, response_model=Publication)
 def create(payload: Profile, role: Write):
     return target_result(
         request("CRM", "POST", "/v1/customers", json=payload.model_dump())
     )
 
 
-@app.put("/api/customers/{customer}")
+@app.put("/api/customers/{customer}", response_model=Publication)
 def update(customer: UUID, payload: Profile, role: Write):
     return target_result(
         request("CRM", "PUT", f"/v1/customers/{customer}", json=payload.model_dump())
     )
 
 
-@app.post("/api/customers/{customer}/payment", status_code=201)
+@app.post(
+    "/api/customers/{customer}/payment", status_code=201, response_model=Publication
+)
 def payment(customer: UUID, payload: Payment, role: Write):
     return target_result(
         request(
@@ -200,12 +203,14 @@ def payment(customer: UUID, payload: Payment, role: Write):
     )
 
 
-@app.get("/api/reconciliation/{customer}")
+@app.get("/api/reconciliation/{customer}", response_model=Reconciliation)
 def check(customer: UUID, role: Read):
     return reconcile(customer)
 
 
-@app.post("/api/reconciliation/{customer}/repair", status_code=202)
+@app.post(
+    "/api/reconciliation/{customer}/repair", status_code=202, response_model=Publication
+)
 def repair_profile(customer: UUID, role: Write):
     return repair(customer, role)
 

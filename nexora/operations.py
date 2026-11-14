@@ -1,10 +1,13 @@
 from uuid import uuid4
 
 import httpx
+from fastapi import HTTPException
 from lxml import etree
+from pydantic import ValidationError
 
 from nexora.adapters import read_remote, request
 from nexora.db import engine, one, rows, run
+from nexora.rest_models import CustomerRecord, ServiceRecord
 
 FIELDS = {"ERP": ("name",), "Billing": ("name", "email")}
 
@@ -15,7 +18,16 @@ def reconcile(customer):
     for target in ("CRM", "ERP", "Billing"):
         try:
             record = read_remote(target, str(customer))
-        except (httpx.HTTPError, ValueError, etree.LxmlError):
+            if record is not None:
+                record = (
+                    (ServiceRecord if target == "ERP" else CustomerRecord)
+                    .model_validate(record)
+                    .model_dump(mode="json")
+                )
+        except (ValidationError, ValueError, etree.LxmlError):
+            record = None
+            issues.append({"target": target, "code": "CONTRACT", "field": None})
+        except httpx.HTTPError:
             record = None
             issues.append({"target": target, "code": "UNREACHABLE"})
         else:
@@ -59,12 +71,8 @@ def reconcile(customer):
 
 def target_result(response):
     if response.status_code >= 500:
-        from fastapi import HTTPException
-
         raise HTTPException(502, "SOURCE_UNAVAILABLE")
     if response.is_error:
-        from fastapi import HTTPException
-
         raise HTTPException(
             response.status_code, response.json().get("detail", "SOURCE_ERROR")
         )

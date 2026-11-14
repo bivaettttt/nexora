@@ -4,7 +4,7 @@ from uuid import uuid4
 import httpx
 
 from nexora.adapters import read_remote, request, soap_request
-from nexora.soap import decode
+from nexora.soap import NS, decode, encode
 
 assert os.environ["SERVICE_KEY"]
 identifier = uuid4()
@@ -35,3 +35,19 @@ assert read_remote("Billing", str(identifier))["name"] == "REST transport"
 assert httpx.get("http://crm:8000/v1/customers").status_code == 401
 assert httpx.get("http://erp:8000/partner.wsdl").status_code == 200
 print("CRM REST, ERP SOAP, Billing REST and service authorization verified")
+
+assert httpx.post("http://erp:8000/soap", content=b"").status_code == 401
+bad_fields = {"GlobalId": str(identifier), "Version": 1, "LegalName": "SOAP transport"}
+
+good_xml = encode("UpsertPartner", bad_fields)
+invalid = request(
+    "ERP",
+    "POST",
+    "/soap",
+    content=good_xml.replace(b"<p:Version>1", b"<p:Version>0"),
+    headers={"SOAPAction": f'"{NS}:UpsertPartner"', "Content-Type": "text/xml"},
+)
+assert invalid.status_code == 500
+assert (
+    decode(invalid.content, accept_fault=True)[1]["faultstring"] == "INVALID_CONTRACT"
+)

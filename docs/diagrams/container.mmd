@@ -1,0 +1,22 @@
+C4Container
+Person(user, "Integration operator")
+System_Boundary(nx, "Nexora") {
+  Container(web, "Web", "React/nginx", "Operational console")
+  Container(api, "API", "FastAPI", "Read models, replay, reconciliation")
+  Container(worker, "Worker", "Python", "Inbox and target deliveries")
+  ContainerDb(db, "Integration DB", "PostgreSQL", "Events, deliveries, attempts and audit")
+  ContainerQueue(mq, "Broker", "RabbitMQ", "Durable ingress queue")
+}
+System_Ext(crm, "CRM")
+System_Ext(erp, "ERP")
+System_Ext(billing, "Billing")
+Rel(user, web, "Uses")
+Rel(web, api, "Calls", "HTTP")
+Rel(api, db, "Reads and schedules")
+Rel(worker, db, "Commits inbox and outcomes")
+Rel(crm, mq, "Publishes profile")
+Rel(billing, mq, "Publishes payment")
+Rel(mq, worker, "Delivers", "AMQP")
+Rel(worker, erp, "Upserts partner", "SOAP")
+Rel(worker, crm, "Updates payment", "REST")
+Rel(worker, billing, "Upserts contract", "REST")

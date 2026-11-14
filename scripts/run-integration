@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+project="${1:-nexora-lab}"
+run() { docker compose -p "$project" "$@"; }
+bundle=$(mktemp)
+trap 'rm -f "$bundle"' EXIT HUP INT TERM
+tar --format=ustar -cf "$bundle" -C scripts integration_smoke.py resilience.py
+run exec -T api sh -ec 'mkdir -p /tmp/nexora-tests && tar -xf - -C /tmp/nexora-tests && python /tmp/nexora-tests/resilience.py' < "$bundle"

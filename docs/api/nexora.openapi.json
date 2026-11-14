@@ -1,6 +1,113 @@
 {
   "components": {
     "schemas": {
+      "CustomerRecord": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "local_id": {
+            "format": "uuid",
+            "title": "Local Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "payment_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "UNPAID",
+                  "PAID"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Status"
+          },
+          "payment_version": {
+            "title": "Payment Version",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "local_id",
+          "version",
+          "name",
+          "email",
+          "payment_status",
+          "payment_version"
+        ],
+        "title": "CustomerRecord",
+        "type": "object"
+      },
+      "Difference": {
+        "properties": {
+          "code": {
+            "enum": [
+              "UNREACHABLE",
+              "MISSING",
+              "IDENTIFIER_MISMATCH",
+              "VERSION_LAG",
+              "AHEAD",
+              "FIELD_DRIFT",
+              "PAYMENT_DRIFT",
+              "CONTRACT"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "target": {
+            "enum": [
+              "ERP",
+              "CRM",
+              "Billing"
+            ],
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "code"
+        ],
+        "title": "Difference",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -78,6 +185,134 @@
           "name"
         ],
         "title": "Profile",
+        "type": "object"
+      },
+      "Publication": {
+        "properties": {
+          "correlation_id": {
+            "format": "uuid",
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "record": {
+            "$ref": "#/components/schemas/CustomerRecord"
+          }
+        },
+        "required": [
+          "record",
+          "event_id",
+          "correlation_id"
+        ],
+        "title": "Publication",
+        "type": "object"
+      },
+      "Reconciliation": {
+        "properties": {
+          "customer_id": {
+            "format": "uuid",
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/Difference"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "records": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ServiceRecord"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Records",
+            "type": "object"
+          }
+        },
+        "required": [
+          "customer_id",
+          "records",
+          "issues"
+        ],
+        "title": "Reconciliation",
+        "type": "object"
+      },
+      "ServiceRecord": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "local_id": {
+            "format": "uuid",
+            "title": "Local Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "payment_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "UNPAID",
+                  "PAID"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Status"
+          },
+          "payment_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Version"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "local_id",
+          "name",
+          "version"
+        ],
+        "title": "ServiceRecord",
         "type": "object"
       },
       "Switch": {
@@ -176,7 +411,13 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerRecord"
+                  },
+                  "title": "Response Customers Api Customers Get",
+                  "type": "array"
+                }
               }
             },
             "description": "Successful Response"
@@ -205,7 +446,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Publication"
+                }
               }
             },
             "description": "Successful Response"
@@ -258,7 +501,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Publication"
+                }
               }
             },
             "description": "Successful Response"
@@ -311,7 +556,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Publication"
+                }
               }
             },
             "description": "Successful Response"
@@ -806,7 +1053,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Reconciliation"
+                }
               }
             },
             "description": "Successful Response"
@@ -849,7 +1098,9 @@
           "202": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/Publication"
+                }
               }
             },
             "description": "Successful Response"

@@ -18,6 +18,7 @@ from nexora.projections import (
     sync_payment,
     sync_profile,
 )
+from nexora.rest_models import CustomerRecord, ProjectionResult, Publication
 
 Correlation = Annotated[UUID | None, Header(alias="X-Correlation-ID")]
 
@@ -71,14 +72,18 @@ def create_source(component: str):
             run(conn, "SELECT 1")
         return {"status": "ok"}
 
-    @app.get("/v1/customers/{customer_id}", dependencies=secured)
+    @app.get(
+        "/v1/customers/{customer_id}",
+        dependencies=secured,
+        response_model=CustomerRecord,
+    )
     def customer(customer_id: UUID):
         with engine().connect() as conn:
             if not crm:
                 check_availability(conn)
             return read_projection(conn, table, customer_id)
 
-    @app.get("/v1/customers", dependencies=secured)
+    @app.get("/v1/customers", dependencies=secured, response_model=list[CustomerRecord])
     def list_customers():
         with engine().connect() as conn:
             if not crm:
@@ -92,12 +97,21 @@ def create_source(component: str):
 
     if crm:
 
-        @app.post("/v1/customers", dependencies=secured, status_code=201)
+        @app.post(
+            "/v1/customers",
+            dependencies=secured,
+            status_code=201,
+            response_model=Publication,
+        )
         def create(payload: Profile, correlation: Correlation = None):
             with engine().begin() as conn:
                 return save_profile(conn, payload, correlation or uuid4())
 
-        @app.put("/v1/customers/{customer_id}", dependencies=secured)
+        @app.put(
+            "/v1/customers/{customer_id}",
+            dependencies=secured,
+            response_model=Publication,
+        )
         def update(
             customer_id: UUID, payload: Profile, correlation: Correlation = None
         ):
@@ -108,19 +122,28 @@ def create_source(component: str):
             "/v1/customers/{customer_id}/republish",
             dependencies=secured,
             status_code=202,
+            response_model=Publication,
         )
         def republish(customer_id: UUID, correlation: Correlation = None):
             with engine().begin() as conn:
                 return republish_profile(conn, customer_id, correlation or uuid4())
 
-        @app.put("/v1/customers/{customer_id}/payment-projection", dependencies=secured)
+        @app.put(
+            "/v1/customers/{customer_id}/payment-projection",
+            dependencies=secured,
+            response_model=ProjectionResult,
+        )
         def payment(customer_id: UUID, payload: PaymentProjection):
             with engine().begin() as conn:
                 return {"outcome": sync_payment(conn, customer_id, payload)}
     else:
         install_fault_control(app)
 
-        @app.put("/v1/customers/{customer_id}", dependencies=secured)
+        @app.put(
+            "/v1/customers/{customer_id}",
+            dependencies=secured,
+            response_model=ProjectionResult,
+        )
         def billing_projection(customer_id: UUID, payload: ProfileProjection):
             with engine().begin() as conn:
                 check_availability(conn)
@@ -139,6 +162,7 @@ def create_source(component: str):
             "/v1/customers/{customer_id}/payments",
             dependencies=secured,
             status_code=201,
+            response_model=Publication,
         )
         def payment(
             customer_id: UUID, payload: Payment, correlation: Correlation = None

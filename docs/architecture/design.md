@@ -32,3 +32,7 @@ Outbox rows are committed with source writes. Publisher confirms precede marking
 Read actual projections through REST and SOAP. Repair republishes the current CRM snapshot using a fresh event ID. Targets apply ordinary version rules. Schedule Lab runs in a dedicated Compose deployment using distinct databases and broker state. Faults simulate temporary availability responses, with no runtime access to the Docker socket.
 
 [RabbitMQ confirms and acknowledgements](https://www.rabbitmq.com/docs/confirms) · [SOAP 1.1](https://www.w3.org/TR/2000/NOTE-SOAP-20000508/)
+
+## Diagrams / Диаграммы
+
+[C4 Context](../diagrams/context.mmd) · [C4 Container](../diagrams/container.mmd) · [Data flow](../diagrams/components.mmd) · [Synchronous sequence](../diagrams/sync.mmd) · [Asynchronous sequence](../diagrams/async.mmd) · [Delivery state machine](../diagrams/lifecycle.mmd) · [BPMN 2.0 ingress](../diagrams/ingress.bpmn) · [ERD](../diagrams/erd.mmd)
