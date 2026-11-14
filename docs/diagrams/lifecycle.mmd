@@ -1,0 +1,10 @@
+stateDiagram-v2
+ [*] --> PENDING: Inbox commit
+ PENDING --> SUCCEEDED: Applied, same or stale
+ PENDING --> RETRY: Transient failure
+ PENDING --> DEAD: Permanent failure
+ RETRY --> RETRY: Attempts remain
+ RETRY --> SUCCEEDED: Applied, same or stale
+ RETRY --> DEAD: Exhausted or permanent
+ DEAD --> PENDING: Operator replay
+ SUCCEEDED --> [*]

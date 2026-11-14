@@ -1,3 +1,3 @@
 # Состояние проекта / Project status
 
-Клонирован отдельный репозиторий. Опубликована [спецификация MVP](analysis/mvp.md). Следующий шаг — архитектура и контракты, затем сквозной маршрут CRM → RabbitMQ → ERP и Billing.
+[Требования](analysis/mvp.md), [архитектура](architecture/design.md) и [AsyncAPI](integrations/asyncapi.yaml) зафиксированы. Следующий шаг — сервисы CRM REST, ERP SOAP и Billing REST со своими БД, затем реальный обмен через RabbitMQ.

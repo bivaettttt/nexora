@@ -1,0 +1,17 @@
+flowchart LR
+ User[Operator] --> UI[Web console]
+ UI --> API[Nexora API]
+ CRM[CRM REST] --> MQ[(RabbitMQ)]
+ Billing[Billing REST] --> MQ
+ MQ --> W[Nexora Worker]
+ W -->|SOAP| ERP[ERP SOAP]
+ W -->|REST| Billing
+ W -->|REST| CRM
+ API -.conciliation.-> CRM
+ API -.conciliation.-> ERP
+ API -.conciliation.-> Billing
+ API --> State[(Nexora PostgreSQL)]
+ W --> State
+ CRM --> C[(CRM PostgreSQL)]
+ ERP --> E[(ERP PostgreSQL)]
+ Billing --> B[(Billing PostgreSQL)]

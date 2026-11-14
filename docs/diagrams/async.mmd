@@ -1,0 +1,19 @@
+sequenceDiagram
+ actor Analyst
+ participant CRM
+ participant Broker as RabbitMQ
+ participant Worker
+ participant ERP
+ participant Billing
+ Analyst->>CRM: POST customer
+ CRM->>CRM: Commit customer and outbox
+ CRM->>Broker: Persistent event and publisher confirm
+ Broker->>Worker: Manual-ack delivery
+ Worker->>Worker: Commit inbox and per-target delivery rows
+ Worker-->>Broker: Ack
+ par Independent targets
+   Worker->>ERP: SOAP UpsertPartner
+ and
+   Worker->>Billing: REST PUT customer projection
+ end
+ Worker->>Worker: Record each attempt and state

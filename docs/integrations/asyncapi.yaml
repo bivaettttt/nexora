@@ -1,0 +1,71 @@
+asyncapi: 2.6.0
+info:
+  title: Nexora inbound events
+  version: 1.0.0
+servers:
+  compose:
+    url: rabbitmq:5672
+    protocol: amqp
+channels:
+  nexora.events:
+    bindings:
+      amqp:
+        is: queue
+        queue:
+          name: nexora.events
+          durable: true
+          exclusive: false
+          autoDelete: false
+    subscribe:
+      message:
+        oneOf:
+          - $ref: '#/components/messages/Profile'
+          - $ref: '#/components/messages/Payment'
+components:
+  messages:
+    Profile:
+      name: customer.profile
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            properties:
+              source: {const: CRM}
+              type: {const: customer.profile}
+              data:
+                type: object
+                required: [name]
+                additionalProperties: false
+                properties:
+                  name: {type: string, minLength: 1, maxLength: 120}
+                  email: {type: [string, 'null'], maxLength: 160}
+    Payment:
+      name: customer.payment
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - type: object
+            properties:
+              source: {const: Billing}
+              type: {const: customer.payment}
+              data:
+                type: object
+                required: [status]
+                additionalProperties: false
+                properties:
+                  status: {enum: [UNPAID, PAID]}
+  schemas:
+    Envelope:
+      type: object
+      additionalProperties: false
+      required: [id, correlation_id, source, type, schema_version, customer_id, version, occurred_at, data]
+      properties:
+        id: {type: string, format: uuid}
+        correlation_id: {type: string, format: uuid}
+        source: {enum: [CRM, Billing]}
+        type: {enum: [customer.profile, customer.payment]}
+        schema_version: {const: 1}
+        customer_id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1, maximum: 2147483647}
+        occurred_at: {type: string, format: date-time}
+        data: {type: object}
