@@ -3,6 +3,7 @@ import { Link, useOutletContext } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api,
+  ApiError,
   short,
   type Broker,
   type Customer,
@@ -13,6 +14,24 @@ import {
 } from "./api";
 import { Badge, Empty, ErrorBox, Heading, Json, Panel } from "./ui";
 
+const uncertainKey = "nexora:payment-checks";
+type UncertainPayments = Record<string, string>;
+
+function loadChecks(): UncertainPayments {
+  try {
+    return JSON.parse(sessionStorage.getItem(uncertainKey) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+}
+function rememberChecks(next: UncertainPayments) {
+  try {
+    sessionStorage.setItem(uncertainKey, JSON.stringify(next));
+  } catch {
+    /* keep the current page guard */
+  }
+}
+
 export function Customers() {
   const { role } = useOutletContext<Viewer>();
   const data = useQuery({
@@ -20,6 +39,7 @@ export function Customers() {
     queryFn: () => api<Customer[]>("/customers"),
   });
   const [edit, setEdit] = useState<Customer | null>(null);
+  const [checks, setChecks] = useState(loadChecks);
   const qc = useQueryClient();
   const change = useMutation({
     mutationFn: ({
@@ -30,10 +50,22 @@ export function Customers() {
       path: string;
       method: string;
       body: unknown;
+      payment?: string;
     }) => api<Publication>(path, method, body),
     onSuccess: () => {
       setEdit(null);
-      void qc.invalidateQueries();
+      void qc.invalidateQueries({ queryKey: ["customers"] });
+    },
+    onError: (error, variables) => {
+      const id = variables.payment;
+      if (id && error instanceof ApiError && error.uncertain) {
+        const reason = error.status
+          ? "Ответ HTTP " + error.status
+          : error.message;
+        const next = { ...checks, [id]: reason };
+        rememberChecks(next);
+        setChecks(next);
+      }
     },
   });
   function submit(e: FormEvent<HTMLFormElement>) {
@@ -54,14 +86,81 @@ export function Customers() {
         title="Клиенты CRM"
         subtitle="Создание и обновление источника, запуск оплаты в Billing"
       />
-      <ErrorBox error={data.error ?? change.error} />
+      <ErrorBox
+        error={
+          data.error ??
+          (change.variables?.payment &&
+          change.error instanceof ApiError &&
+          change.error.uncertain
+            ? null
+            : change.error)
+        }
+      />
       {change.data && (
         <div className="notice" role="status">
-          Источник сохранил запись.{" "}
-          <Link to={"/messages/" + change.data.event_id}>
+          {change.variables?.payment
+            ? "Billing подтвердил запись оплаты."
+            : "CRM сохранила профиль."}{" "}
+          <Link
+            to={"/messages/" + change.data.event_id}
+            state={{ publication: change.data.event_id }}
+          >
             Открыть событие {short(change.data.event_id)}
           </Link>
         </div>
+      )}
+      {Object.entries(checks).map(([id, reason]) => (
+        <div className="uncertain-command" key={id}>
+          <div role="status">
+            <h2>Результат операции пока неизвестен</h2>
+            <p>
+              {reason}. Команда оплаты была отправлена, подтверждение результата
+              не получено. Billing мог сохранить оплату. Повтор может создать
+              ещё одну версию.
+            </p>
+            <p>
+              Клиент <code>{id}</code> · Event ID из ответа недоступен.
+            </p>
+          </div>
+          <div className="actions">
+            <Link
+              to={
+                "/messages?source=Billing&kind=customer.payment&customer_id=" +
+                encodeURIComponent(id)
+              }
+            >
+              Проверить события оплаты
+            </Link>
+            <Link to={"/reconcile?customer=" + encodeURIComponent(id)}>
+              Проверить состояние клиента
+            </Link>
+          </div>
+          {role !== "viewer" && (
+            <details>
+              <summary>Управление блокировкой повтора</summary>
+              <p>
+                Снимайте блокировку после проверки журнала и состояния клиента.
+                Эта отметка сохраняет ваше решение в текущей вкладке.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = { ...checks };
+                  delete next[id];
+                  rememberChecks(next);
+                  setChecks(next);
+                }}
+              >
+                Проверку завершил · снять блокировку
+              </button>
+            </details>
+          )}
+        </div>
+      ))}
+      {change.isPending && change.variables?.payment && (
+        <p role="status" className="notice">
+          Ожидаем подтверждение Billing.
+        </p>
       )}
       {role !== "viewer" && (
         <Panel title={edit ? "Изменить профиль" : "Новый клиент"}>
@@ -126,12 +225,13 @@ export function Customers() {
                         <>
                           <button onClick={() => setEdit(c)}>Изменить</button>
                           <button
-                            disabled={change.isPending}
+                            disabled={change.isPending || Boolean(checks[c.id])}
                             onClick={() =>
                               change.mutate({
                                 path: `/customers/${c.id}/payment`,
                                 method: "POST",
                                 body: { status: "PAID" },
+                                payment: c.id,
                               })
                             }
                           >
@@ -157,7 +257,9 @@ export function Reconcile() {
   const [input, setInput] = useState(
     () => new URLSearchParams(location.search).get("customer") ?? "",
   );
-  const [customer, setCustomer] = useState("");
+  const [customer, setCustomer] = useState(
+    () => new URLSearchParams(location.search).get("customer") ?? "",
+  );
   const data = useQuery({
     queryKey: ["reconciliation", customer],
     queryFn: () =>
@@ -224,7 +326,15 @@ export function Reconcile() {
                     {data.data.issues.map((i, index) => (
                       <tr key={index}>
                         <td>{i.target}</td>
-                        <td className="mono">{i.code}</td>
+                        <td title={i.code}>
+                          {{
+                            UNAVAILABLE: "Сервис недоступен",
+                            MISSING: "Проекция отсутствует",
+                            VERSION_LAG: "Версия отстаёт",
+                            VALUE_MISMATCH: "Значение отличается",
+                          }[i.code] ?? i.code}{" "}
+                          · <code>{i.code}</code>
+                        </td>
                         <td>{i.field ?? "—"}</td>
                       </tr>
                     ))}
@@ -252,6 +362,23 @@ export function Reconcile() {
               )}
           </Panel>
           <Panel title="Записи источников">
+            <dl className="meta">
+              {Object.entries(data.data.records).map(([name, value]) => (
+                <div key={name}>
+                  <dt>{name}</dt>
+                  <dd>
+                    {value
+                      ? "v" + value.version
+                      : data.data.issues.some(
+                            (i) =>
+                              i.target === name && i.code === "UNAVAILABLE",
+                          )
+                        ? "Недоступен"
+                        : "Запись отсутствует"}
+                  </dd>
+                </div>
+              ))}
+            </dl>
             {Object.entries(data.data.records).map(([name, value]) => (
               <details key={name}>
                 <summary>{name}</summary>
@@ -264,7 +391,10 @@ export function Reconcile() {
       {repair.data && (
         <p className="notice" role="status">
           Опубликована актуальная версия профиля.{" "}
-          <Link to={"/messages/" + repair.data.event_id}>
+          <Link
+            to={"/messages/" + repair.data.event_id}
+            state={{ publication: repair.data.event_id }}
+          >
             Отследить доставку
           </Link>
         </p>
@@ -275,6 +405,7 @@ export function Reconcile() {
 
 export function Lab() {
   const [event, setEvent] = useState("");
+  const [availability, setAvailability] = useState<Record<string, string>>({});
   const qc = useQueryClient();
   const queue = useQuery({
     queryKey: ["broker"],
@@ -296,9 +427,19 @@ export function Lab() {
       method: string;
       body: unknown;
     }) => api<Record<string, unknown>>(path, method, body),
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       if (typeof result.event_id === "string") setEvent(result.event_id);
-      void qc.invalidateQueries();
+      if (variables.path.startsWith("/lab/availability/")) {
+        const target = variables.path.split("/").at(-1)!;
+        setAvailability((previous) => ({
+          ...previous,
+          [target]: (variables.body as { unavailable: boolean }).unavailable
+            ? "Недоступность включена"
+            : "Недоступность отключена",
+        }));
+      }
+      void qc.invalidateQueries({ queryKey: ["broker"] });
+      void qc.invalidateQueries({ queryKey: ["lab-dlq"] });
     },
   });
   function send(path: string, method: string, body: unknown) {
@@ -320,6 +461,11 @@ export function Lab() {
             {["ERP", "Billing"].map((target) => (
               <div key={target} className="actions">
                 <strong>{target}</strong>
+                {availability[target] && (
+                  <small role="status">
+                    Последняя команда · {availability[target]}
+                  </small>
+                )}
                 <button
                   disabled={action.isPending}
                   onClick={() =>
@@ -368,6 +514,10 @@ export function Lab() {
         <div className="panel-body stack">
           <label>
             Event ID
+            <small>
+              Дубликат использует тот же Event ID. Для устаревшей версии
+              выберите событие v2 или выше.
+            </small>
             <input
               value={event}
               onChange={(e) => setEvent(e.target.value)}
@@ -411,12 +561,21 @@ export function Lab() {
             </button>
           </div>
           {event && (
-            <Link to={"/messages/" + encodeURIComponent(event)}>
+            <Link
+              to={"/messages/" + encodeURIComponent(event)}
+              state={{ publication: event }}
+            >
               Отследить сообщение {short(event)}
             </Link>
           )}
         </div>
         <ErrorBox error={action.error} />
+        {action.data?.published === "duplicate" && (
+          <p role="status" className="notice">
+            Повторная публикация подтверждена с тем же Event ID. Число доставок
+            и попыток можно сверить в трассировке.
+          </p>
+        )}
         {action.data && (
           <details open>
             <summary>Ответ API</summary>

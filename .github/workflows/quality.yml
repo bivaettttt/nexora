@@ -27,7 +27,15 @@ jobs:
       - run: docker compose -p nexora-lab exec -T crm python - < scripts/services-smoke.py
       - run: scripts/run-integration && scripts/restart-check
       - working-directory: frontend
+        env:
+          NEXORA_SCREENSHOTS: ${{ runner.temp }}/nexora-screenshots
         run: npx playwright install --with-deps chromium && npm run test:e2e
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexora-browser-evidence
+          path: ${{ runner.temp }}/nexora-screenshots
+          if-no-files-found: ignore
       - if: failure()
         run: docker compose -p nexora-lab logs --no-color
       - if: always()

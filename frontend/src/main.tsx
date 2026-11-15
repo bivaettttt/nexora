@@ -3,7 +3,7 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "./styles.css";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -14,7 +14,7 @@ import {
   Route,
   Routes,
   useOutletContext,
-  useParams,
+  useLocation,
 } from "react-router-dom";
 import {
   QueryClient,
@@ -28,10 +28,9 @@ import {
   ArrowRight,
   BookOpen,
   Boxes,
-  Cable,
   FlaskConical,
   GitBranch,
-  History,
+  Menu,
   LayoutDashboard,
   List,
   LogOut,
@@ -47,7 +46,6 @@ import {
   short,
   stamp,
   type Broker,
-  type Detail,
   type EventRow,
   type Issue,
   type Route as RouteModel,
@@ -55,13 +53,16 @@ import {
   type System,
   type Viewer,
 } from "./api";
-import { Badge, Empty, ErrorBox, Events, Heading, Json, Panel } from "./ui";
+import { Badge, Empty, ErrorBox, Events, Heading, Panel } from "./ui";
 import { Customers, Lab, Reconcile } from "./workflows";
+import { Explorer } from "./explorer";
+import { Message } from "./trace";
+import { messageLink, outcomes, protocol } from "./presentation";
 
 const client = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
-const polling = { refetchInterval: 2000 };
+const polling = { refetchInterval: 4000 };
 const navigation = [
   ["/", "Сводка", LayoutDashboard],
   ["/systems", "Системы", Boxes],
@@ -130,62 +131,175 @@ function Login({ onLogin }: { onLogin: (user: Viewer) => void }) {
     </div>
   );
 }
+const groups = [
+  [
+    "Работа с событиями",
+    navigation.filter(([, label]) =>
+      ["Сводка", "Сообщения", "Ошибки", "Очередь DLQ"].includes(label),
+    ),
+  ],
+  [
+    "Интеграции",
+    navigation.filter(([, label]) =>
+      ["Системы", "Маршруты", "Маппинг", "Контракты"].includes(label),
+    ),
+  ],
+  [
+    "Данные",
+    navigation.filter(([, label]) => ["Клиенты CRM", "Сверка"].includes(label)),
+  ],
+] as const;
+
 function Shell() {
   const [user, setUser] = useState<Viewer | null>(null);
+  const [menu, setMenu] = useState(false);
+  const location = useLocation();
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const main = useRef<HTMLElement>(null);
   const qc = useQueryClient();
+  useEffect(() => {
+    if (user) main.current?.focus({ preventScroll: true });
+  }, [location.pathname, user]);
   if (!user) return <Login onLogin={setUser} />;
   return (
     <div className="shell">
-      <aside className="sidebar">
-        <Brand />
-        <div className="side-label">INTEGRATION CONTROL CENTER</div>
-        <nav aria-label="Разделы консоли">
-          {navigation.map(([path, label, Icon]) => (
-            <NavLink to={path} end={path === "/"} key={path}>
-              <Icon size={17} />
-              {label}
-            </NavLink>
-          ))}
-          {user.lab && (
-            <NavLink to="/lab">
-              <FlaskConical size={17} />
-              Лаборатория
-            </NavLink>
-          )}
-        </nav>
-        <div className="side-foot">
-          <i />
-          {user.lab ? "Изолированный стенд" : "Учебный стенд"}
-        </div>
-      </aside>
-      <div className="workspace">
-        <div className="topbar">
-          <span>
-            <Cable size={16} /> Nexora <span className="slash">/</span>{" "}
-            Операционная консоль
+      <a href="#main-content" className="skip-link">
+        К содержимому
+      </a>
+      <header className="app-bar">
+        <div className="app-bar-inner">
+          <Link
+            to="/"
+            aria-label="Nexora · Сводка"
+            onClick={() => setMenu(false)}
+          >
+            <Brand />
+          </Link>
+          <span className="environment">
+            {user.lab ? "Изолированный стенд" : "Учебный стенд"}
           </span>
-          <div>
+          <div className="account">
             <span className="role">{user.role}</span>
+            <button
+              className="menu-toggle"
+              ref={menuButton}
+              aria-controls="console-navigation"
+              aria-expanded={menu}
+              onClick={() => setMenu(!menu)}
+            >
+              <Menu size={16} aria-hidden="true" /> Разделы
+            </button>
             <button
               className="icon"
               aria-label="Выйти"
               onClick={() => {
                 session("");
                 qc.clear();
+                setMenu(false);
                 setUser(null);
               }}
             >
-              <LogOut size={17} />
+              <LogOut size={17} aria-hidden="true" />
             </button>
           </div>
         </div>
-        <main>
+      </header>
+      <nav
+        id="console-navigation"
+        className={"console-navigation" + (menu ? " menu-open" : "")}
+        aria-label="Разделы консоли"
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && menu) {
+            setMenu(false);
+            menuButton.current?.focus();
+          }
+        }}
+      >
+        <div className="console-navigation-inner">
+          {groups.map(([label, items]) => (
+            <div className="nav-section" key={label}>
+              <p>{label}</p>
+              <ul>
+                {items.map(([path, name, Icon]) => (
+                  <li key={path}>
+                    <NavLink
+                      to={path}
+                      end={path === "/"}
+                      onClick={() => {
+                        setMenu(false);
+                        if (menu)
+                          requestAnimationFrame(() => main.current?.focus());
+                      }}
+                    >
+                      <Icon size={15} aria-hidden="true" />
+                      {name}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {user.lab && (
+            <div className="nav-section">
+              <p>Изолированный стенд</p>
+              <ul>
+                <li>
+                  <NavLink
+                    to="/lab"
+                    onClick={() => {
+                      setMenu(false);
+                      if (menu)
+                        requestAnimationFrame(() => main.current?.focus());
+                    }}
+                  >
+                    <FlaskConical size={15} aria-hidden="true" />
+                    Лаборатория
+                  </NavLink>
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
+      </nav>
+      <div className="workspace">
+        <main id="main-content" tabIndex={-1} ref={main}>
           <Outlet context={user} />
         </main>
       </div>
     </div>
   );
 }
+
+function useIssues(dead = false, offset = 0) {
+  return useQuery({
+    queryKey: ["issues", dead, offset],
+    queryFn: () => api<Issue[]>(`/errors?dead_only=${dead}&offset=${offset}`),
+    refetchInterval: 4000,
+  });
+}
+
+function IssueRows({ items, from }: { items: Issue[]; from?: string }) {
+  return (
+    <ul className="issue-list">
+      {items.map((i) => (
+        <li key={i.event_id + (i.delivery_id ?? "")}>
+          <div>
+            <Link to={messageLink(i.event_id, i.delivery_id, undefined, from)}>
+              {i.target ?? "Входной карантин"} ·{" "}
+              <code>{short(i.event_id)}</code>
+            </Link>
+            <p>
+              {outcomes[i.code] ?? i.code} · <code>{i.code}</code>
+            </p>
+          </div>
+          <Badge status={i.status} />
+          <span className="muted">Событие принято {stamp(i.received_at)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Dashboard() {
   const stats = useQuery({
     queryKey: ["stats"],
@@ -194,7 +308,7 @@ function Dashboard() {
   });
   const messages = useQuery({
     queryKey: ["recent"],
-    queryFn: () => api<EventRow[]>("/messages"),
+    queryFn: () => api<EventRow[]>("/messages?include_deliveries=true"),
     ...polling,
   });
   const broker = useQuery({
@@ -205,96 +319,133 @@ function Dashboard() {
   const systems = useQuery({
     queryKey: ["systems"],
     queryFn: () => api<System[]>("/systems"),
-    refetchInterval: 5000,
+    refetchInterval: 7000,
   });
-  const d = stats.data;
-  const failed = d?.states
-    .filter((s) => s.status === "DEAD")
-    .reduce((sum, s) => sum + s.count, 0);
+  const issues = useIssues();
+  const pending = stats.data?.states
+    .filter((x) => x.status === "PENDING")
+    .reduce((n, x) => n + x.count, 0);
+  const counts = stats.data?.states.filter(
+    (x) => x.status === "RETRY" || x.status === "DEAD",
+  );
   return (
     <>
       <Heading
         title="Сводка обмена"
-        subtitle="Состояние транспортной очереди и доставок по получателям"
+        subtitle="Исключения интеграций и доступность получателей"
       >
-        <Link className="primary" to="/customers">
-          Клиенты CRM <ArrowRight size={16} />
+        <Link className="primary" to="/messages">
+          Найти событие <ArrowRight size={16} aria-hidden="true" />
         </Link>
       </Heading>
       <ErrorBox
-        error={stats.error ?? messages.error ?? broker.error ?? systems.error}
-      />
-      <div className="metrics">
-        {[
-          ["Принято событий", d?.events],
-          ["Изолировано", d && d.rejected + (failed ?? 0)],
-          ["RabbitMQ · готово", broker.data?.ready],
-          ["Попытка · p95", d?.p95_ms == null ? null : d.p95_ms + " мс"],
-          ["Попытка · среднее", d?.mean_ms == null ? null : d.mean_ms + " мс"],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <span>{label}</span>
-            <strong>{value ?? "—"}</strong>
-          </div>
-        ))}
-      </div>
-      <div className="cols">
-        <Panel title="Участники обмена">
-          <div className="system-list">
-            {systems.data?.map((s) => (
-              <div key={s.name}>
-                <span>
-                  <Boxes size={17} />
-                  <strong>{s.name}</strong>
-                  <small>{s.protocol}</small>
-                </span>
-                <Badge status={s.reachable ? "UP" : "DOWN"} />
-              </div>
-            )) ?? <Empty pending={systems.isPending} />}
-          </div>
-        </Panel>
-        <Panel title="Статусы доставок">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Получатель</th>
-                  <th>Состояние</th>
-                  <th>Число</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d?.states.map((s) => (
-                  <tr key={s.target + s.status}>
-                    <td>{s.target}</td>
-                    <td>
-                      <Badge status={s.status} />
-                    </td>
-                    <td>{s.count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {d?.states.length === 0 && <Empty />}
-        </Panel>
-      </div>
-      <Panel
-        title="Последние события"
-        action={
-          <Link to="/messages">
-            Открыть журнал <ArrowRight size={15} />
-          </Link>
+        error={
+          stats.error ??
+          messages.error ??
+          broker.error ??
+          systems.error ??
+          issues.error
         }
-      >
-        <Events
-          data={messages.data?.slice(0, 7)}
-          pending={messages.isPending}
-        />
-      </Panel>
+      />
+      <div className="operations-grid">
+        <div>
+          <Panel
+            title="Требуют внимания"
+            action={<Link to="/errors">Мониторинг ошибок</Link>}
+          >
+            {issues.data?.length ? (
+              <IssueRows items={issues.data.slice(0, 6)} from="/errors" />
+            ) : (
+              <Empty pending={issues.isPending}>
+                {issues.error
+                  ? "Список временно недоступен."
+                  : "Активных ошибок и отклонений нет."}
+              </Empty>
+            )}
+          </Panel>
+          <Panel
+            title="Последние события"
+            action={<Link to="/messages">Открыть журнал</Link>}
+          >
+            <Events
+              data={messages.data?.slice(0, 7)}
+              pending={messages.isPending}
+            />
+          </Panel>
+        </div>
+        <div>
+          <Panel title="Операционная очередь">
+            <ul className="queue-links">
+              <li>
+                <Link to="/messages?status=PENDING">В очереди у Nexora</Link>
+                <strong>{pending ?? "—"}</strong>
+              </li>
+              <li>
+                <Link to="/messages?status=RETRY">Ожидают повтора</Link>
+                <strong>
+                  {counts
+                    ? counts
+                        .filter((x) => x.status === "RETRY")
+                        .reduce((n, x) => n + x.count, 0)
+                    : "—"}
+                </strong>
+              </li>
+              <li>
+                <Link to="/dlq">Терминальные доставки</Link>
+                <strong>
+                  {counts
+                    ? counts
+                        .filter((x) => x.status === "DEAD")
+                        .reduce((n, x) => n + x.count, 0)
+                    : "—"}
+                </strong>
+              </li>
+              <li>
+                <Link to="/dlq">Входной карантин</Link>
+                <strong>{stats.data?.rejected ?? "—"}</strong>
+              </li>
+            </ul>
+          </Panel>
+          <Panel title="Транспорт RabbitMQ">
+            {broker.isPending ? (
+              <Empty pending />
+            ) : !broker.data?.available ? (
+              <Empty>Данные брокера недоступны.</Empty>
+            ) : (
+              <dl className="meta">
+                <div>
+                  <dt>Готово</dt>
+                  <dd>{broker.data.ready ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt>Без подтверждения</dt>
+                  <dd>{broker.data.unacked ?? "—"}</dd>
+                </div>
+              </dl>
+            )}
+          </Panel>
+          <Panel
+            title="Участники обмена"
+            action={<Link to="/systems">Контракты и health</Link>}
+          >
+            <div className="system-list">
+              {systems.data?.map((s) => (
+                <div key={s.name}>
+                  <span>
+                    <strong>{s.name}</strong>
+                    <small>{s.protocol}</small>
+                  </span>
+                  <Badge status={s.reachable ? "UP" : "DOWN"} />
+                </div>
+              )) ?? <Empty pending={systems.isPending} />}
+            </div>
+          </Panel>
+        </div>
+      </div>
     </>
   );
 }
+
 function Systems() {
   const data = useQuery({
     queryKey: ["systems"],
@@ -347,14 +498,33 @@ function RoutesPage({ mapping = false }: { mapping?: boolean }) {
     queryKey: ["routes"],
     queryFn: () => api<RouteModel[]>("/routes"),
   });
+  const operations: Record<string, { method: string; contract: string }> = {
+    ERP: { method: "POST /soap · UpsertPartner", contract: "partner.wsdl" },
+    Billing: {
+      method: "PUT /v1/customers/{id}",
+      contract: "billing.openapi.json",
+    },
+    CRM: {
+      method: "PUT /v1/customers/{id}/payment-projection",
+      contract: "crm.openapi.json",
+    },
+  };
   const fields = [
     [
       "CRM → ERP",
       "customer_id, version, data.name",
       "GlobalId, Version, LegalName",
     ],
-    ["CRM → Billing", "data.name, data.email, version", "name, email, version"],
-    ["Billing → CRM", "data.status, version", "status, version"],
+    [
+      "CRM → Billing",
+      "customer_id, data.name, data.email, version",
+      "{id} в URL, name, email, version",
+    ],
+    [
+      "Billing → CRM",
+      "customer_id, data.status, version",
+      "{id} в URL, status, version",
+    ],
   ];
   return (
     <>
@@ -367,6 +537,59 @@ function RoutesPage({ mapping = false }: { mapping?: boolean }) {
         }
       />
       <ErrorBox error={data.error} />
+      {!mapping && (
+        <Panel
+          title="Архитектура обмена"
+          action={<a href="/contracts/asyncapi.yaml">AMQP · AsyncAPI</a>}
+        >
+          <div className="architecture">
+            <ol className="architecture-lanes" aria-label="Путь по архитектуре">
+              {data.data?.map((route) => (
+                <li key={route.event}>
+                  <div className="architecture-origin">
+                    <strong>{route.source}</strong>
+                    <small>
+                      {route.event} · схема v{route.version}
+                    </small>
+                  </div>
+                  <span className="architecture-edge">Outbox · AMQP</span>
+                  <div className="architecture-node">
+                    <strong>RabbitMQ</strong>
+                    <small>nexora.events</small>
+                  </div>
+                  <span className="architecture-edge">AMQP</span>
+                  <div className="architecture-node">
+                    <strong>Nexora Worker</strong>
+                    <small>Inbox · PostgreSQL</small>
+                  </div>
+                  <span className="architecture-edge">HTTP</span>
+                  <ul className="architecture-targets">
+                    {route.targets.map((target) => (
+                      <li key={target}>
+                        <strong>
+                          {target} · {protocol[target]}
+                        </strong>
+                        <small>{operations[target]?.method}</small>
+                        {operations[target] && (
+                          <a href={"/contracts/" + operations[target].contract}>
+                            Открыть контракт
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+            {data.isPending && <Empty pending />}
+            <p className="muted">
+              AMQP доставляет событие до Nexora. Worker подтверждает его после
+              записи Inbox и вызывает получателей отдельно. Таблица ниже
+              содержит текстовый перечень маршрутов.
+            </p>
+          </div>
+        </Panel>
+      )}
       <Panel title={mapping ? "Поля получателей" : "Реестр маршрутов"}>
         <div className="table-wrap">
           <table>
@@ -405,7 +628,14 @@ function RoutesPage({ mapping = false }: { mapping?: boolean }) {
                       <td className="mono">{r.event}</td>
                       <td>{r.source}</td>
                       <td>v{r.version}</td>
-                      <td>{r.targets.join(" · ")}</td>
+                      <td>
+                        {r.targets.join(" · ")}{" "}
+                        <Link
+                          to={"/messages?kind=" + encodeURIComponent(r.event)}
+                        >
+                          События маршрута
+                        </Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -424,299 +654,42 @@ function RoutesPage({ mapping = false }: { mapping?: boolean }) {
     </>
   );
 }
-function Explorer() {
-  const [filters, setFilters] = useState("");
-  const [offset, setOffset] = useState(0);
-  const data = useQuery({
-    queryKey: ["messages", filters, offset],
-    queryFn: () => api<EventRow[]>(`/messages?${filters}&offset=${offset}`),
-    ...polling,
-  });
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const params = new URLSearchParams();
-    for (const [key, value] of new FormData(e.currentTarget)) {
-      const raw = String(value).trim();
-      if (raw)
-        params.set(key, key === "since" ? new Date(raw).toISOString() : raw);
-    }
-    setFilters(params.toString());
-    setOffset(0);
-  }
-  return (
-    <>
-      <Heading
-        title="Журнал сообщений"
-        subtitle="Поиск по маршруту, времени, идентификаторам и статусу доставки"
-      />
-      <Panel title="Фильтры">
-        <form className="filters" onSubmit={submit}>
-          <label>
-            Event ID
-            <input name="event_id" placeholder="UUID" />
-          </label>
-          <label>
-            Correlation ID
-            <input name="correlation_id" placeholder="UUID" />
-          </label>
-          <label>
-            Тип
-            <select name="kind">
-              <option value="">Все</option>
-              <option>customer.profile</option>
-              <option>customer.payment</option>
-            </select>
-          </label>
-          <label>
-            Источник
-            <select name="source">
-              <option value="">Все</option>
-              <option>CRM</option>
-              <option>Billing</option>
-            </select>
-          </label>
-          <label>
-            Получатель
-            <select name="target">
-              <option value="">Все</option>
-              <option>CRM</option>
-              <option>ERP</option>
-              <option>Billing</option>
-            </select>
-          </label>
-          <label>
-            Статус
-            <select name="status">
-              <option value="">Все</option>
-              <option>PENDING</option>
-              <option>RETRY</option>
-              <option>SUCCEEDED</option>
-              <option>DEAD</option>
-            </select>
-          </label>
-          <label>
-            Получено после
-            <input name="since" type="datetime-local" />
-          </label>
-          <button className="primary">Найти</button>
-        </form>
-      </Panel>
-      <ErrorBox error={data.error} />
-      <Panel title="События">
-        <Events data={data.data} pending={data.isPending} />
-        <div className="pager">
-          <button disabled={!offset} onClick={() => setOffset(offset - 50)}>
-            Назад
-          </button>
-          <span>{offset / 50 + 1}</span>
-          <button
-            disabled={(data.data?.length ?? 0) < 50}
-            onClick={() => setOffset(offset + 50)}
-          >
-            Далее
-          </button>
-        </div>
-      </Panel>
-    </>
-  );
-}
-function Message() {
-  const { id } = useParams();
-  const user = useViewer();
-  const qc = useQueryClient();
-  const data = useQuery({
-    queryKey: ["message", id],
-    queryFn: () => api<Detail>("/messages/" + id),
-    ...polling,
-  });
-  const replay = useMutation({
-    mutationFn: (delivery: string) =>
-      api("/deliveries/" + delivery + "/replay", "POST"),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-  if (data.isPending) return <Empty pending />;
-  if (data.error) return <ErrorBox error={data.error} />;
-  const { event, deliveries, related } = data.data;
-  return (
-    <>
-      <Link to="/messages">← Журнал сообщений</Link>
-      <Heading title={event.type ?? "Событие в карантине"} subtitle={event.id}>
-        {event.rejection && <Badge status="QUARANTINED" />}
-      </Heading>
-      <Panel title="Событие">
-        <dl className="meta">
-          <div>
-            <dt>Correlation ID</dt>
-            <dd className="mono">{event.correlation_id ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>Клиент</dt>
-            <dd className="mono">{event.customer_id ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>Получено</dt>
-            <dd>{stamp(event.received_at)}</dd>
-          </div>
-          <div>
-            <dt>Контракт / версия</dt>
-            <dd>{event.version ? "v1 / " + event.version : event.rejection}</dd>
-          </div>
-        </dl>
-        <details>
-          <summary>Полезная нагрузка</summary>
-          <Json value={event.payload} />
-        </details>
-      </Panel>
-      <ErrorBox error={replay.error} />
-      {replay.isSuccess && (
-        <p role="status" className="notice">
-          Повтор поставлен в очередь.
-        </p>
-      )}
-      {deliveries.map((d) => (
-        <Panel
-          key={d.id}
-          title={"Доставка · " + d.target}
-          action={<Badge status={d.status} />}
-        >
-          <dl className="meta">
-            <div>
-              <dt>Delivery ID</dt>
-              <dd className="mono">{d.id}</dd>
-            </div>
-            <div>
-              <dt>Результат</dt>
-              <dd>{d.outcome ?? "—"}</dd>
-            </div>
-            {d.status === "RETRY" && (
-              <div>
-                <dt>Следующая попытка</dt>
-                <dd>{stamp(d.next_at)}</dd>
-              </div>
-            )}
-          </dl>
-          <details>
-            <summary>Преобразование и поля назначения</summary>
-            <Json value={d.transformation} />
-          </details>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Серия / попытка</th>
-                  <th>Время</th>
-                  <th>Длительность</th>
-                  <th>HTTP</th>
-                  <th>Результат</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.attempts.map((a) => (
-                  <tr key={a.id}>
-                    <td>
-                      {a.generation + 1} / {a.number}
-                    </td>
-                    <td>{stamp(a.started_at)}</td>
-                    <td>{a.duration_ms} мс</td>
-                    <td>{a.http_status ?? "—"}</td>
-                    <td className="mono">{a.outcome}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {!d.attempts.length && <Empty>Ожидание первой попытки.</Empty>}
-          {d.status === "DEAD" && user.role !== "viewer" && (
-            <div className="panel-body">
-              <button
-                disabled={replay.isPending}
-                onClick={() => replay.mutate(d.id)}
-              >
-                Повторить доставку
-              </button>
-            </div>
-          )}
-        </Panel>
-      ))}
-      <Panel title="Связанные события">
-        {related.length ? (
-          <ul className="related">
-            {related.map((item) => (
-              <li key={item.id}>
-                <Link to={"/messages/" + item.id}>
-                  <History size={15} />
-                  {item.type ?? "Событие"} · {short(item.id)}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <Empty />
-        )}
-      </Panel>
-    </>
-  );
-}
 function Errors({ dead = false }: { dead?: boolean }) {
   const [offset, setOffset] = useState(0);
-  const data = useQuery({
-    queryKey: ["errors", dead, offset],
-    queryFn: () => api<Issue[]>(`/errors?dead_only=${dead}&offset=${offset}`),
-    ...polling,
-  });
+  const data = useIssues(dead, offset);
   return (
     <>
       <Heading
         title={dead ? "Очередь DLQ" : "Мониторинг ошибок"}
         subtitle={
           dead
-            ? "Устойчивый реестр отклонённых событий и исчерпанных доставок"
-            : "Активные повторы, отказавшие доставки и ошибки контракта"
+            ? "Входной карантин и терминальные доставки · PostgreSQL"
+            : "Входные отклонения, активные повторы и терминальные доставки"
         }
       />
       <ErrorBox error={data.error} />
       <Panel
         title={dead ? "Карантин и исчерпанные доставки" : "Ошибки обработки"}
+        action={
+          <Link to={dead ? "/errors" : "/dlq"}>
+            {dead ? "Все ошибки" : "Только DLQ"}
+          </Link>
+        }
       >
         {data.data?.length ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Сообщение</th>
-                  <th>Цель</th>
-                  <th>Причина</th>
-                  <th>Состояние</th>
-                  <th>Получено</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.data.map((e) => (
-                  <tr key={e.event_id + (e.delivery_id ?? "")}>
-                    <td>
-                      <Link to={"/messages/" + e.event_id}>
-                        {short(e.event_id)}
-                      </Link>
-                    </td>
-                    <td>{e.target ?? "Inbox"}</td>
-                    <td className="mono">{e.code}</td>
-                    <td>
-                      <Badge status={e.status} />
-                    </td>
-                    <td>{stamp(e.received_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <IssueRows items={data.data} from={dead ? "/dlq" : "/errors"} />
         ) : (
-          <Empty pending={data.isPending}>Ошибок на этой странице нет.</Empty>
+          <Empty pending={data.isPending}>
+            {data.error
+              ? "Список временно недоступен."
+              : "Ошибок на этой странице нет."}
+          </Empty>
         )}
         <div className="pager">
           <button disabled={!offset} onClick={() => setOffset(offset - 50)}>
             Назад
           </button>
-          <span>{offset / 50 + 1}</span>
+          <span>Страница {offset / 50 + 1}</span>
           <button
             disabled={(data.data?.length ?? 0) < 50}
             onClick={() => setOffset(offset + 50)}

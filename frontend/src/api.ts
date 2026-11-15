@@ -14,6 +14,7 @@ export type EventRow = {
   rejection: string | null;
   succeeded: number;
   total: number;
+  deliveries?: DeliverySummary[];
 };
 export type Attempt = {
   id: number;
@@ -24,14 +25,19 @@ export type Attempt = {
   http_status: number | null;
   outcome: string;
 };
-export type Delivery = {
+export type DeliverySummary = {
   id: string;
   target: string;
   status: string;
   outcome: string | null;
   next_at: string;
-  transformation: unknown;
+  generation: number;
+  last_attempt_at?: string | null;
+};
+export type Delivery = DeliverySummary & {
+  transformation: Record<string, unknown>;
   attempts: Attempt[];
+  replays?: { created_at: string }[];
 };
 export type Detail = {
   event: EventRow & { payload: unknown };
@@ -105,27 +111,61 @@ const errors: Record<string, string> = {
     "Профиль CRM недоступен для восстановления.",
   VERSION_CONFLICT: "Конфликт данных одной версии.",
 };
+export class ApiError extends Error {
+  constructor(
+    public status: number | null,
+    public code: string | null,
+    message: string,
+  ) {
+    super(message);
+  }
+
+  get uncertain() {
+    return this.status === null || this.status === 408 || this.status >= 500;
+  }
+}
+
 export async function api<T>(
   path: string,
   method = "GET",
   body?: unknown,
 ): Promise<T> {
-  const response = await fetch("/api" + path, {
-    method,
-    headers: {
-      Authorization: "Bearer " + token,
-      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const payload = await response.json();
-  if (!response.ok)
-    throw new Error(
-      errors[payload.detail] ??
+  let response: Response;
+  try {
+    response = await fetch("/api" + path, {
+      method,
+      signal: AbortSignal.timeout(15000),
+      headers: {
+        Authorization: "Bearer " + token,
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (error) {
+    const timedOut =
+      error instanceof DOMException && error.name === "TimeoutError";
+    throw new ApiError(
+      null,
+      null,
+      timedOut
+        ? "Истекло время ожидания ответа."
+        : "Связь с сервером прервана.",
+    );
+  }
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const code = typeof payload?.detail === "string" ? payload.detail : null;
+    throw new ApiError(
+      response.status,
+      code,
+      (code ? errors[code] : undefined) ??
         (response.status === 422
           ? "Проверьте формат введённых данных."
           : `Запрос завершился с HTTP ${response.status}.`),
     );
+  }
+  if (payload === null)
+    throw new ApiError(null, null, "Ответ сервера не удалось прочитать.");
   return payload;
 }
 export const stamp = (time: string) =>
@@ -135,5 +175,13 @@ export const stamp = (time: string) =>
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-  }).format(new Date(time));
+    timeZone: "UTC",
+  }).format(new Date(time)) + " UTC";
 export const short = (id: string | null) => id?.slice(0, 8) ?? "—";
+
+export const timelineStamp = (time: string) =>
+  new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+    timeStyle: "medium",
+    timeZone: "UTC",
+  }).format(new Date(time)) + " UTC";
