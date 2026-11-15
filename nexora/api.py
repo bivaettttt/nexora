@@ -108,23 +108,32 @@ def messages(
     status: Literal["PENDING", "RETRY", "SUCCEEDED", "DEAD"] | None = None,
     since: datetime | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
+    customer_id: UUID | None = None,
+    delivery_id: UUID | None = None,
+    order: Literal["newest", "oldest"] = "newest",
+    include_deliveries: bool = False,
 ):
-    with engine().connect() as conn:
-        return rows(
+    with (
+        engine().connect().execution_options(isolation_level="REPEATABLE READ") as conn
+    ):
+        result = rows(
             conn,
             """SELECT e.id,e.correlation_id,e.customer_id,e.source,e.type,e.version,e.rejection,e.received_at,
                    (SELECT count(*) FROM deliveries d WHERE d.event_id=e.id AND d.status='SUCCEEDED') AS succeeded,
                    (SELECT count(*) FROM deliveries d WHERE d.event_id=e.id) AS total
                    FROM events e WHERE (CAST(:id AS uuid) IS NULL OR e.id=:id)
+                   AND (CAST(:customer AS uuid) IS NULL OR e.customer_id=:customer)
                    AND (CAST(:correlation AS uuid) IS NULL OR e.correlation_id=:correlation)
                    AND (CAST(:source AS text) IS NULL OR e.source=:source)
                    AND (CAST(:kind AS text) IS NULL OR e.type=:kind)
                    AND (CAST(:since AS timestamptz) IS NULL OR e.received_at>=:since)
-                   AND ((CAST(:target AS text) IS NULL AND CAST(:status AS text) IS NULL)
+                   AND ((CAST(:target AS text) IS NULL AND CAST(:status AS text) IS NULL AND CAST(:delivery AS uuid) IS NULL)
                    OR EXISTS (SELECT 1 FROM deliveries d WHERE d.event_id=e.id
                      AND (CAST(:target AS text) IS NULL OR d.target=:target)
-                     AND (CAST(:status AS text) IS NULL OR d.status=:status)))
-                   ORDER BY e.received_at DESC,e.id DESC LIMIT 50 OFFSET :offset""",
+                     AND (CAST(:status AS text) IS NULL OR d.status=:status)
+                     AND (CAST(:delivery AS uuid) IS NULL OR d.id=:delivery)))
+                   ORDER BY CASE WHEN :oldest THEN e.received_at END ASC,
+                            e.received_at DESC,e.id DESC LIMIT 50 OFFSET :offset""",
             id=event_id,
             correlation=correlation_id,
             source=source,
@@ -133,7 +142,30 @@ def messages(
             target=target,
             status=status,
             offset=offset,
+            customer=customer_id,
+            delivery=delivery_id,
+            oldest=order == "oldest",
         )
+        if not include_deliveries or not result:
+            return result
+        by_id = {item["id"]: item for item in result}
+        for item in result:
+            item["deliveries"] = []
+        summaries = rows(
+            conn,
+            """SELECT d.event_id,d.id,d.target,d.status,d.outcome,d.next_at,d.generation,
+                      a.started_at AS last_attempt_at
+                 FROM deliveries d LEFT JOIN LATERAL (
+                     SELECT started_at FROM attempts WHERE delivery_id=d.id
+                     ORDER BY generation DESC,number DESC LIMIT 1
+                 ) a ON true
+                WHERE d.event_id=ANY(CAST(:ids AS uuid[]))
+                ORDER BY d.target""",
+            ids=list(by_id),
+        )
+        for summary in summaries:
+            by_id[summary.pop("event_id")]["deliveries"].append(summary)
+        return result
 
 
 @app.get("/api/messages/{identifier}")

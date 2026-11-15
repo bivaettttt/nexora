@@ -125,6 +125,11 @@ def message(identifier):
                 "SELECT * FROM attempts WHERE delivery_id=:id ORDER BY id",
                 id=item["id"],
             )
+            item["replays"] = rows(
+                conn,
+                "SELECT created_at FROM actions WHERE action='REPLAY' AND object_id=:id ORDER BY id",
+                id=item["id"],
+            )
         related = rows(
             conn,
             """SELECT id,type,received_at FROM events WHERE id<>:id AND
