@@ -284,7 +284,12 @@ function IssueRows({ items, from }: { items: Issue[]; from?: string }) {
       {items.map((i) => (
         <li key={i.event_id + (i.delivery_id ?? "")}>
           <div>
-            <Link to={messageLink(i.event_id, i.delivery_id, undefined, from)}>
+            <Link
+              to={messageLink(i.event_id, i.delivery_id, undefined, from)}
+              aria-label={
+                (i.target ?? "Входной карантин") + " · " + short(i.event_id)
+              }
+            >
               {i.target ?? "Входной карантин"} ·{" "}
               <code>{short(i.event_id)}</code>
             </Link>

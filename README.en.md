@@ -35,9 +35,11 @@ The applications use distinct PostgreSQL databases and roles. Nexora API and Wor
 
 ## Demonstrate
 
-Create a customer in **Клиенты CRM**, open its event and compare the ERP and Billing transformations. Record a payment and inspect the CRM delivery. In the lab, disable ERP responses, create a customer and wait for four ERP attempts. Billing completes independently. Restore ERP and use **Повторить доставку** in message details. Inspect both attempt generations and run reconciliation.
+Create a customer in **Клиенты CRM**, open its event and compare the ERP and Billing transformations. Record a payment and inspect the CRM delivery. In the lab, disable ERP responses, create a customer and wait for four ERP attempts. Billing completes independently. Restore ERP, open the delivery from the DLQ, and confirm replay. Inspect both attempt generations under the same Delivery ID and run reconciliation. If the payment response is lost, inspect the customer’s payment events and reconciliation before taking further action.
 
-[Dashboard](assets/screenshots/dashboard.png) · [Routes](assets/screenshots/routes.png) · [Messages](assets/screenshots/messages.png) · [Details](assets/screenshots/details.png) · [DLQ](assets/screenshots/dlq.png) · [Lab](assets/screenshots/lab.png) · [Reconciliation](assets/screenshots/reconciliation.png)
+[Redesign notes](docs/ux-ui-redesign.md) · [Acceptance matrix](docs/testing/ux-acceptance.md)
+
+[Workbench](assets/screenshots/workbench.png) · [Message Explorer](assets/screenshots/messages.png) · [Successful delivery](assets/screenshots/successful-delivery.png) · [Partial delivery](assets/screenshots/partial-delivery.png) · [Timeline](assets/screenshots/timeline.png) · [Retry](assets/screenshots/retry-details.png) · [DLQ](assets/screenshots/dlq.png) · [Recovery](assets/screenshots/recovery.png) · [Transport and business state](assets/screenshots/stale-result.png) · [Error inspector](assets/screenshots/error-inspector.png) · [Architecture](assets/screenshots/routes.png) · [SOAP and payload](assets/screenshots/payload-inspector.png) · [Dashboard](assets/screenshots/dashboard.png) · [Mobile trace](assets/screenshots/mobile-trace.png) · [Uncertain payment](assets/screenshots/uncertain-payment.png) · [Lab](assets/screenshots/lab.png) · [Reconciliation](assets/screenshots/reconciliation.png)
 
 ## Quality and limits
 

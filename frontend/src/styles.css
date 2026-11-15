@@ -95,6 +95,9 @@ a.primary:hover {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
+.app-bar :focus-visible {
+  outline-color: #a8eee6;
+}
 [tabindex="-1"]:focus {
   outline: none;
 }

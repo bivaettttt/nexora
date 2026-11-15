@@ -35,9 +35,11 @@ scripts/lab up
 
 ## Как показать
 
-Создайте клиента в разделе **Клиенты CRM**, откройте событие и сравните трансформации ERP и Billing. Запишите оплату и найдите доставку в CRM. В лаборатории отключите ответы ERP, создайте клиента и дождитесь четырёх попыток ERP. Billing завершит доставку независимо. Включите ERP и нажмите **Повторить доставку** в деталях сообщения. Покажите две серии попыток и запустите сверку.
+Создайте клиента в разделе **Клиенты CRM**, откройте событие и сравните трансформации ERP и Billing. Запишите оплату и найдите доставку в CRM. В лаборатории отключите ответы ERP, создайте клиента и дождитесь четырёх попыток ERP. Billing завершит доставку независимо. Включите ERP, откройте доставку из DLQ и подтвердите повтор. Покажите две серии попыток с одним Delivery ID и запустите сверку. Если после команды оплаты ответ потерян, проверьте события клиента и сверку перед следующим действием.
 
-[Сводка](assets/screenshots/dashboard.png) · [Маршруты](assets/screenshots/routes.png) · [Журнал](assets/screenshots/messages.png) · [Детали](assets/screenshots/details.png) · [DLQ](assets/screenshots/dlq.png) · [Лаборатория](assets/screenshots/lab.png) · [Сверка](assets/screenshots/reconciliation.png)
+[Описание редизайна](docs/ux-ui-redesign.md) · [Матрица приёмки](docs/testing/ux-acceptance.md)
+
+[Workbench](assets/screenshots/workbench.png) · [Журнал сообщений](assets/screenshots/messages.png) · [Успешная доставка](assets/screenshots/successful-delivery.png) · [Частичная доставка](assets/screenshots/partial-delivery.png) · [Хронология](assets/screenshots/timeline.png) · [Повторы](assets/screenshots/retry-details.png) · [DLQ](assets/screenshots/dlq.png) · [Восстановление](assets/screenshots/recovery.png) · [Транспорт и бизнес](assets/screenshots/stale-result.png) · [Разбор ошибки](assets/screenshots/error-inspector.png) · [Архитектура](assets/screenshots/routes.png) · [SOAP и данные](assets/screenshots/payload-inspector.png) · [Сводка](assets/screenshots/dashboard.png) · [Мобильная версия](assets/screenshots/mobile-trace.png) · [Неопределённый результат оплаты](assets/screenshots/uncertain-payment.png) · [Лаборатория](assets/screenshots/lab.png) · [Сверка](assets/screenshots/reconciliation.png)
 
 ## Качество и границы
 

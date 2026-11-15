@@ -8,7 +8,7 @@
 | TC-04 | RabbitMQ downtime, Worker restart and Outbox republish | CRM committed an unsent Outbox row during downtime. Both target deliveries completed after restart. The same outbox message was confirmed again and delivery attempts remained single |
 | TC-05 | Reconciliation and repair | Missing ERP record detected after service recovery. CRM republish restored it and cleared discrepancies |
 | TC-06 | Contract and access | Eight pytest cases passed. Live SOAP/REST checks passed. Viewer write, lab access without admin, and arbitrary target values were rejected. BPMN validated against OMG BPMN 2.0 XML Schema |
-| TC-07 | Real browser | Three Chromium tests passed for creation and reconciliation, real quarantine, and mobile viewer navigation |
+| TC-07 | Real browser | Seven Chromium scenarios passed on the first redesign CI run, including separate recipient states, replay, stale and duplicate events, and uncertain payment. See the [UX acceptance matrix](ux-acceptance.md) for coverage and limits. |
 
 The strategy combines pure validation and mapping assertions, contract fixtures, live endpoint comparisons, fault and recovery scripts, and browser assertions. Integration tests operate on a separate Compose project with synthetic data, real RabbitMQ and dedicated PostgreSQL databases. The restart test resets a sent marker to reproduce the relay crash window, then verifies republication. Shared role keys, per-customer snapshots and retention are bounded by the educational scope.
 

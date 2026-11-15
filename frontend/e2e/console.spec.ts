@@ -122,7 +122,19 @@ test("CRM creation reaches ERP and Billing and reconciles", async ({
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const created = await publish(page, "Nexora E2E " + Date.now());
+  await page.route(
+    "**/api/messages/" + created.event_id,
+    (route) =>
+      route.fulfill({ status: 404, json: { detail: "MESSAGE_MISSING" } }),
+    { times: 1 },
+  );
   await openEvent(page);
+  await expect(
+    page.getByRole("heading", { name: "Ожидается приём события" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Копировать Event ID" }),
+  ).toBeVisible();
   const detail = await waitDelivery(page, created.event_id, {
     ERP: "SUCCEEDED",
     Billing: "SUCCEEDED",
@@ -131,6 +143,12 @@ test("CRM creation reaches ERP and Billing and reconciles", async ({
   await expect(destination(page, "ERP")).toContainText("Применено");
   await expect(destination(page, "Billing")).toContainText("Применено");
   await shot(page, "workbench");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await button(page, "Копировать Correlation ID").press("Enter");
+  await expect(page.getByText("Скопировано", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    created.correlation_id,
+  );
   await selected(page, "ERP");
   await shot(page, "successful-delivery", true);
   await page

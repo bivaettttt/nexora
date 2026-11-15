@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -40,6 +40,15 @@ export function Customers() {
   });
   const [edit, setEdit] = useState<Customer | null>(null);
   const [checks, setChecks] = useState(loadChecks);
+  const currentChecks = useRef(checks);
+  function updateCheck(id: string, reason?: string) {
+    const next = { ...currentChecks.current };
+    if (reason) next[id] = reason;
+    else delete next[id];
+    currentChecks.current = next;
+    rememberChecks(next);
+    setChecks(next);
+  }
   const qc = useQueryClient();
   const change = useMutation({
     mutationFn: ({
@@ -52,7 +61,8 @@ export function Customers() {
       body: unknown;
       payment?: string;
     }) => api<Publication>(path, method, body),
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
+      if (variables.payment) updateCheck(variables.payment);
       setEdit(null);
       void qc.invalidateQueries({ queryKey: ["customers"] });
     },
@@ -62,9 +72,9 @@ export function Customers() {
         const reason = error.status
           ? "Ответ HTTP " + error.status
           : error.message;
-        const next = { ...checks, [id]: reason };
-        rememberChecks(next);
-        setChecks(next);
+        updateCheck(id, reason);
+      } else if (id) {
+        updateCheck(id);
       }
     },
   });
@@ -109,54 +119,48 @@ export function Customers() {
           </Link>
         </div>
       )}
-      {Object.entries(checks).map(([id, reason]) => (
-        <div className="uncertain-command" key={id}>
-          <div role="status">
-            <h2>Результат операции пока неизвестен</h2>
-            <p>
-              {reason}. Команда оплаты была отправлена, подтверждение результата
-              не получено. Billing мог сохранить оплату. Повтор может создать
-              ещё одну версию.
-            </p>
-            <p>
-              Клиент <code>{id}</code> · Event ID из ответа недоступен.
-            </p>
-          </div>
-          <div className="actions">
-            <Link
-              to={
-                "/messages?source=Billing&kind=customer.payment&customer_id=" +
-                encodeURIComponent(id)
-              }
-            >
-              Проверить события оплаты
-            </Link>
-            <Link to={"/reconcile?customer=" + encodeURIComponent(id)}>
-              Проверить состояние клиента
-            </Link>
-          </div>
-          {role !== "viewer" && (
-            <details>
-              <summary>Управление блокировкой повтора</summary>
+      {Object.entries(checks)
+        .filter(([id]) => !change.isPending || change.variables?.payment !== id)
+        .map(([id, reason]) => (
+          <div className="uncertain-command" key={id}>
+            <div role="status">
+              <h2>Результат операции пока неизвестен</h2>
               <p>
-                Снимайте блокировку после проверки журнала и состояния клиента.
-                Эта отметка сохраняет ваше решение в текущей вкладке.
+                {reason}. Команда оплаты была отправлена, подтверждение
+                результата не получено. Billing мог сохранить оплату. Повтор
+                может создать ещё одну версию.
               </p>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = { ...checks };
-                  delete next[id];
-                  rememberChecks(next);
-                  setChecks(next);
-                }}
+              <p>
+                Клиент <code>{id}</code> · Event ID из ответа недоступен.
+              </p>
+            </div>
+            <div className="actions">
+              <Link
+                to={
+                  "/messages?source=Billing&kind=customer.payment&customer_id=" +
+                  encodeURIComponent(id)
+                }
               >
-                Проверку завершил · снять блокировку
-              </button>
-            </details>
-          )}
-        </div>
-      ))}
+                Проверить события оплаты
+              </Link>
+              <Link to={"/reconcile?customer=" + encodeURIComponent(id)}>
+                Проверить состояние клиента
+              </Link>
+            </div>
+            {role !== "viewer" && (
+              <details>
+                <summary>Управление блокировкой повтора</summary>
+                <p>
+                  Снимайте блокировку после проверки журнала и состояния
+                  клиента. Эта отметка сохраняет ваше решение в текущей вкладке.
+                </p>
+                <button type="button" onClick={() => updateCheck(id)}>
+                  Проверку завершил · снять блокировку
+                </button>
+              </details>
+            )}
+          </div>
+        ))}
       {change.isPending && change.variables?.payment && (
         <p role="status" className="notice">
           Ожидаем подтверждение Billing.
@@ -226,14 +230,19 @@ export function Customers() {
                           <button onClick={() => setEdit(c)}>Изменить</button>
                           <button
                             disabled={change.isPending || Boolean(checks[c.id])}
-                            onClick={() =>
+                            onClick={() => {
+                              if (currentChecks.current[c.id]) return;
+                              updateCheck(
+                                c.id,
+                                "Команда ожидала подтверждения",
+                              );
                               change.mutate({
                                 path: `/customers/${c.id}/payment`,
                                 method: "POST",
                                 body: { status: "PAID" },
                                 payment: c.id,
-                              })
-                            }
+                              });
+                            }}
                           >
                             Оплатить
                           </button>
@@ -563,7 +572,11 @@ export function Lab() {
           {event && (
             <Link
               to={"/messages/" + encodeURIComponent(event)}
-              state={{ publication: event }}
+              state={
+                action.data?.event_id === event
+                  ? { publication: event }
+                  : undefined
+              }
             >
               Отследить сообщение {short(event)}
             </Link>
@@ -574,6 +587,12 @@ export function Lab() {
           <p role="status" className="notice">
             Повторная публикация подтверждена с тем же Event ID. Число доставок
             и попыток можно сверить в трассировке.
+          </p>
+        )}
+        {action.data?.published === "invalid" && (
+          <p role="status" className="notice">
+            Публикация подтверждена. После проверки контракта запись появится во
+            входном карантине. <Link to="/dlq">Открыть карантин</Link>
           </p>
         )}
         {action.data && (
