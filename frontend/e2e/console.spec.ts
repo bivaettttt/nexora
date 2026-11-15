@@ -469,8 +469,28 @@ test("lost confirmation preserves uncertainty and does not post again", async ({
   page,
 }) => {
   test.setTimeout(100000);
-  await login(page, "admin", "/customers");
-  const created = await publish(page, "Uncertain payment " + Date.now());
+  let releaseList = () => {};
+  const holdList = new Promise<void>((resolve) => {
+    releaseList = resolve;
+  });
+  let held = false;
+  await page.route("**/api/customers", async (route) => {
+    if (!held && route.request().method() === "GET") {
+      held = true;
+      await holdList;
+    }
+    await route.continue();
+  });
+  let created: Publication;
+  try {
+    await login(page, "admin", "/customers");
+    created = await publish(page, "Uncertain payment " + Date.now());
+    await expect(
+      page.getByRole("row").filter({ hasText: created.record.id }),
+    ).toBeVisible();
+  } finally {
+    releaseList();
+  }
   await waitDelivery(page, created.event_id, {
     ERP: "SUCCEEDED",
     Billing: "SUCCEEDED",

@@ -61,8 +61,17 @@ export function Customers() {
       body: unknown;
       payment?: string;
     }) => api<Publication>(path, method, body),
-    onSuccess: (_result, variables) => {
-      if (variables.payment) updateCheck(variables.payment);
+    onSuccess: async (result, variables) => {
+      if (variables.payment) {
+        updateCheck(variables.payment);
+      } else {
+        // A read begun before the write may still hold an older CRM snapshot.
+        await qc.cancelQueries({ queryKey: ["customers"] });
+        qc.setQueryData<Customer[]>(["customers"], (list) => [
+          result.record,
+          ...(list ?? []).filter((record) => record.id !== result.record.id),
+        ]);
+      }
       setEdit(null);
       void qc.invalidateQueries({ queryKey: ["customers"] });
     },
